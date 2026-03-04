@@ -1,0 +1,19 @@
+<!--
+  Ghost Layer — GTM Custom HTML Tag
+  ===================================
+  Paste this into a GTM "Custom HTML" tag.
+  Set the trigger to "All Pages" (or scope to product pages only).
+
+  REQUIRED: Replace YOUR_BRAND_ID with your brand UUID from the Try Instant Fit dashboard.
+-->
+<script>
+  (function() {
+    if (document.getElementById('ghostlayer-sdk')) return; // don't double-load
+    var s = document.createElement('script');
+    s.id = 'ghostlayer-sdk';
+    s.src = 'https://backend-psi-peach.vercel.app/ghostlayer-widget.js';
+    s.setAttribute('data-brand-id', 'YOUR_BRAND_ID');
+    s.async = true;
+    document.head.appendChild(s);
+  })();
+</script>

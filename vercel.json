@@ -1,0 +1,10 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "functions": {
+    "src/app/api/widget/try-on/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}

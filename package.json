@@ -1,0 +1,28 @@
+{
+  "name": "tryinstantfit-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start --port 3001",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^7.14.0",
+    "@google-cloud/vertexai": "^1.9.3",
+    "@google/genai": "^1.43.0",
+    "@google/generative-ai": "^0.24.1",
+    "@gradio/client": "^2.1.0",
+    "@supabase/supabase-js": "^2.49.1",
+    "google-auth-library": "^10.6.1",
+    "next": "^16.1.6",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.19",
+    "@types/react": "^18.3.18",
+    "typescript": "^5.8.2"
+  }
+}
