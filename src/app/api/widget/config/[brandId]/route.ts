@@ -39,7 +39,7 @@ export async function GET(
       buttonText: config?.button_text ?? DEFAULT_CONFIG.buttonText,
       buttonColor: config?.button_color ?? DEFAULT_CONFIG.buttonColor,
       buttonPosition: config?.button_position ?? DEFAULT_CONFIG.buttonPosition,
-      apiEndpoint: process.env.NEXT_PUBLIC_API_URL ?? 'https://api.tryinstantfit.com',
+      apiEndpoint: process.env.NEXT_PUBLIC_API_URL ?? 'https://backend-tryinstantfit.vercel.app',
     });
   } catch (error) {
     console.error('[config] Error fetching widget config:', error);
@@ -47,7 +47,7 @@ export async function GET(
     return NextResponse.json({
       brandId,
       ...DEFAULT_CONFIG,
-      apiEndpoint: process.env.NEXT_PUBLIC_API_URL ?? 'https://api.tryinstantfit.com',
+      apiEndpoint: process.env.NEXT_PUBLIC_API_URL ?? 'https://backend-tryinstantfit.vercel.app',
     });
   }
 }
