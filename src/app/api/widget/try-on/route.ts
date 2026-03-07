@@ -165,13 +165,11 @@ export async function POST(request: NextRequest) {
         cost_usd:           useFallback
           ? (() => {
               const m = usedGeminiModel ?? '';
-              if (m.startsWith('imagen-4.0-ultra'))  return 0.06;                            // Imagen 4 Ultra: $0.06 flat
-              if (m.startsWith('imagen-4.0-fast'))   return 0.02;                            // Imagen 4 Fast: $0.02 flat
-              if (m.startsWith('imagen-4.0'))         return 0.04;                            // Imagen 4 Standard: $0.04 flat
-              if (m.includes('pro'))                  return usedGarmentCache ? 0.13 : 0.27; // Pro: $0.134 cached, $0.27 fresh
-              return usedGarmentCache ? 0.045 : 0.09;                                        // Flash: $0.045 cached, $0.09 fresh
+              if (m.includes('pro'))       return usedGarmentCache ? 0.13  : 0.27;  // Pro 3/3.1: $0.134 cached, $0.27 fresh (1K)
+              if (m.includes('2.5-flash')) return usedGarmentCache ? 0.022 : 0.044; // Flash 2.5: $0.022 cached, $0.044 fresh (512px)
+              return                              usedGarmentCache ? 0.045 : 0.09;  // Flash 3.1: $0.045 cached, $0.09 fresh (512px)
             })()
-          : 0.04,                                                                             // Virtual Try-On: $0.04 flat
+          : 0.04,                                                                    // Virtual Try-On: $0.04 flat
         source:             'ghost-layer',
       })
       .then(({ error }) => {
