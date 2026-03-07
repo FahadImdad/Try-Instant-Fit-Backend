@@ -49,8 +49,10 @@ export async function POST(request: NextRequest) {
     const brandId         = formData.get('brand_id')          as string | null;
     const productId       = formData.get('product_id')        as string | null;
     const productName     = formData.get('product_name')      as string | null;
-    const provider        = formData.get('provider')          as string | null;
-    const geminiModel     = formData.get('gemini_model')      as string | null;
+    const provider           = formData.get('provider')           as string | null;
+    const geminiModel        = formData.get('gemini_model')       as string | null;
+    const outputResolution   = formData.get('output_resolution')  as string | null;
+    const maxDim = outputResolution ? parseInt(outputResolution, 10) : 1024;
 
     // ── Validation ──────────────────────────────────────────────────────────
     if (!userPhotoFile)   return NextResponse.json({ error: 'user_photo is required' },        { status: 400 });
@@ -113,7 +115,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const geminiResult = await geminiTryOn(userPhotoBase64, userPhotoFile.type, productBase64, productMimeType, cachedGarment, geminiModel ?? undefined);
+      const geminiResult = await geminiTryOn(userPhotoBase64, userPhotoFile.type, productBase64, productMimeType, cachedGarment, geminiModel ?? undefined, maxDim);
       resultBase64 = geminiResult.data;
       resultMimeType = geminiResult.mimeType;
       isolatedGarmentResult = geminiResult.isolatedGarment;
@@ -165,11 +167,16 @@ export async function POST(request: NextRequest) {
         cost_usd:           useFallback
           ? (() => {
               const m = usedGeminiModel ?? '';
-              if (m.includes('pro'))       return usedGarmentCache ? 0.13  : 0.27;  // Pro 3/3.1: $0.134 cached, $0.27 fresh (1K)
-              if (m.includes('2.5-flash')) return usedGarmentCache ? 0.022 : 0.044; // Flash 2.5: $0.022 cached, $0.044 fresh (512px)
-              return                              usedGarmentCache ? 0.045 : 0.09;  // Flash 3.1: $0.045 cached, $0.09 fresh (512px)
+              const r = maxDim; // 512 | 1024 | 2048 | 4096
+              // Cost per output image by model & resolution (from Google pricing)
+              const perImg = m.includes('pro')
+                ? (r <= 512 ? 0.134 : r <= 1024 ? 0.134 : r <= 2048 ? 0.134 : 0.24)  // Pro: flat $0.134 up to 2K, $0.24 at 4K
+                : m.includes('2.5-flash')
+                  ? (r <= 512 ? 0.022 : r <= 1024 ? 0.034 : r <= 2048 ? 0.050 : 0.076) // Flash 2.5
+                  : (r <= 512 ? 0.045 : r <= 1024 ? 0.067 : r <= 2048 ? 0.101 : 0.151); // Flash 3.1
+              return usedGarmentCache ? perImg : perImg * 2; // cached=1 call, fresh=2 calls
             })()
-          : 0.04,                                                                    // Virtual Try-On: $0.04 flat
+          : 0.04,                                                                         // Virtual Try-On: $0.04 flat
         source:             'ghost-layer',
       })
       .then(({ error }) => {

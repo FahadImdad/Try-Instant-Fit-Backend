@@ -28,12 +28,12 @@ async function getAccessToken(scope: string): Promise<string> {
 // This ensures the API always gets a clean, consistent input regardless of what
 // the user uploaded (huge PNG, tiny JPEG, portrait, landscape, etc.)
 
-export async function preprocessImage(base64: string, mimeType: string): Promise<{ base64: string; mimeType: string }> {
+export async function preprocessImage(base64: string, mimeType: string, maxDim = 1024): Promise<{ base64: string; mimeType: string }> {
   const inputBuffer = Buffer.from(base64, 'base64');
 
   const outputBuffer = await sharp(inputBuffer)
     .rotate()                          // auto-rotate based on EXIF orientation
-    .resize(1024, 1024, {
+    .resize(maxDim, maxDim, {
       fit: 'inside',                   // scale down only, never upscale
       withoutEnlargement: true,
     })
@@ -197,8 +197,19 @@ export async function geminiTryOn(
   productBase64: string,
   productMimeType: string,
   cachedGarment?: { data: string; mimeType: string },
-  model = TRYON_MODEL_FALLBACK
+  model = TRYON_MODEL_FALLBACK,
+  maxDim = 1024
 ): Promise<{ data: string; mimeType: string; model: string; isolatedGarment?: { data: string; mimeType: string } }> {
+  // Preprocess user photo to target resolution before sending to Gemini
+  const [userPhoto, productImg] = await Promise.all([
+    preprocessImage(userPhotoBase64, userMimeType, maxDim),
+    preprocessImage(productBase64, productMimeType, maxDim),
+  ]);
+  userPhotoBase64 = userPhoto.base64;
+  userMimeType = userPhoto.mimeType;
+  productBase64 = productImg.base64;
+  productMimeType = productImg.mimeType;
+
   let garment: { data: string; mimeType: string };
   let freshlyIsolated = false;
 
