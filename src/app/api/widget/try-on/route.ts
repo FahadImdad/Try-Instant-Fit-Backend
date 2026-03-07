@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { virtualTryOn, TRYON_MODEL_PRIMARY } from '@/lib/gemini';
+import { virtualTryOn, geminiTryOn, TRYON_MODEL_PRIMARY, TRYON_MODEL_FALLBACK } from '@/lib/gemini';
 import { uploadTryOnResult } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 
@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     const brandId         = formData.get('brand_id')          as string | null;
     const productId       = formData.get('product_id')        as string | null;
     const productName     = formData.get('product_name')      as string | null;
+    const provider        = formData.get('provider')          as string | null;
 
     // ── Validation ──────────────────────────────────────────────────────────
     if (!userPhotoFile)   return NextResponse.json({ error: 'user_photo is required' },        { status: 400 });
@@ -46,10 +47,15 @@ export async function POST(request: NextRequest) {
     const productBuffer = Buffer.from(await productResponse.arrayBuffer());
     const productBase64 = productBuffer.toString('base64');
 
-    // ── Call Virtual Try-On API ─────────────────────────────────────────────
-    console.log('[try-on] Calling Virtual Try-On API...');
-    const { data: resultBase64, mimeType: resultMimeType } =
-      await virtualTryOn(userPhotoBase64, productBase64);
+    // ── Call AI model based on provider ────────────────────────────────────
+    const useFallback = provider === 'fallback';
+    console.log(`[try-on] Using provider: ${useFallback ? 'fallback (Gemini)' : 'primary (Virtual Try-On)'}`);
+
+    const { data: resultBase64, mimeType: resultMimeType } = useFallback
+      ? await geminiTryOn(userPhotoBase64, userPhotoFile.type, productBase64, (productResponse.headers.get('content-type') ?? 'image/jpeg').split(';')[0])
+      : await virtualTryOn(userPhotoBase64, productBase64);
+
+    const aiModel = useFallback ? TRYON_MODEL_FALLBACK : TRYON_MODEL_PRIMARY;
     console.log('[try-on] Done.');
 
     // ── Upload result to Google Cloud Storage ───────────────────────────────
@@ -66,9 +72,9 @@ export async function POST(request: NextRequest) {
         product_id:         productId,
         product_name:       productName,
         result_image_url:   resultUrl,
-        ai_model:           TRYON_MODEL_PRIMARY,
+        ai_model:           aiModel,
         processing_time_ms: processingTimeMs,
-        cost_usd:           0.04,
+        cost_usd:           useFallback ? 0.14 : 0.04,
         source:             'ghost-layer',
       })
       .then(({ error }) => {
@@ -78,7 +84,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       result_url:         resultUrl,
       processing_time_ms: processingTimeMs,
-      model:              TRYON_MODEL_PRIMARY,
+      model:              aiModel,
     });
 
   } catch (error) {
