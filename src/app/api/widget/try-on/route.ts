@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
     const productId       = formData.get('product_id')        as string | null;
     const productName     = formData.get('product_name')      as string | null;
     const provider        = formData.get('provider')          as string | null;
+    const geminiModel     = formData.get('gemini_model')      as string | null;
 
     // ── Validation ──────────────────────────────────────────────────────────
     if (!userPhotoFile)   return NextResponse.json({ error: 'user_photo is required' },        { status: 400 });
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest) {
     let resultBase64: string;
     let resultMimeType: string;
     let isolatedGarmentResult: { data: string; mimeType: string } | undefined;
+    let usedGarmentCache = false;
 
     if (useFallback) {
       const productMimeType = (productResponse.headers.get('content-type') ?? 'image/jpeg').split(';')[0];
@@ -103,13 +105,14 @@ export async function POST(request: NextRequest) {
             if (resp.ok) {
               const buf = Buffer.from(await resp.arrayBuffer());
               cachedGarment = { data: buf.toString('base64'), mimeType: cacheRow.mime_type ?? 'image/jpeg' };
+              usedGarmentCache = true;
               console.log('[try-on] Cache hit: using cached isolated garment for product:', productId);
             }
           } catch { /* ignore — will re-isolate */ }
         }
       }
 
-      const geminiResult = await geminiTryOn(userPhotoBase64, userPhotoFile.type, productBase64, productMimeType, cachedGarment);
+      const geminiResult = await geminiTryOn(userPhotoBase64, userPhotoFile.type, productBase64, productMimeType, cachedGarment, geminiModel ?? undefined);
       resultBase64 = geminiResult.data;
       resultMimeType = geminiResult.mimeType;
       isolatedGarmentResult = geminiResult.isolatedGarment;
@@ -157,7 +160,7 @@ export async function POST(request: NextRequest) {
         result_image_url:   resultUrl,
         ai_model:           aiModel,
         processing_time_ms: processingTimeMs,
-        cost_usd:           useFallback ? 0.14 : 0.04,
+        cost_usd:           useFallback ? (usedGarmentCache ? 0.04 : 0.08) : 0.04,
         source:             'ghost-layer',
       })
       .then(({ error }) => {

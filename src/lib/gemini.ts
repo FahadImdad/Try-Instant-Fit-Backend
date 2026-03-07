@@ -133,10 +133,10 @@ export async function virtualTryOn(
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function callGemini(requestBody: object): Promise<any> {
+async function callGemini(requestBody: object, model = TRYON_MODEL_FALLBACK): Promise<any> {
   const token = await getAccessToken('https://www.googleapis.com/auth/generative-language');
 
-  const response = await fetch(`${GEMINI_BASE_URL}/${TRYON_MODEL_FALLBACK}:generateContent`, {
+  const response = await fetch(`${GEMINI_BASE_URL}/${model}:generateContent`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -155,7 +155,8 @@ async function callGemini(requestBody: object): Promise<any> {
 
 async function isolateGarment(
   productBase64: string,
-  productMimeType: string
+  productMimeType: string,
+  model = TRYON_MODEL_FALLBACK
 ): Promise<{ data: string; mimeType: string }> {
   const result = await callGemini({
     contents: [
@@ -164,6 +165,7 @@ async function isolateGarment(
         parts: [
           {
             text: `This is a product catalog photo showing a garment worn by a model or mannequin.
+
 Your task: output an image of ONLY the garment item, completely isolated on a plain white background.
 - Remove the model/mannequin entirely — keep ONLY the clothing
 - Remove the background
@@ -177,7 +179,7 @@ Output: just the garment on a white background with its exact original color and
       },
     ],
     generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
-  });
+  }, model);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const parts: any[] = result.candidates?.[0]?.content?.parts ?? [];
@@ -194,7 +196,8 @@ export async function geminiTryOn(
   userMimeType: string,
   productBase64: string,
   productMimeType: string,
-  cachedGarment?: { data: string; mimeType: string }
+  cachedGarment?: { data: string; mimeType: string },
+  model = TRYON_MODEL_FALLBACK
 ): Promise<{ data: string; mimeType: string; model: string; isolatedGarment?: { data: string; mimeType: string } }> {
   let garment: { data: string; mimeType: string };
   let freshlyIsolated = false;
@@ -204,7 +207,7 @@ export async function geminiTryOn(
     garment = cachedGarment;
   } else {
     console.log('[try-on] Fallback Step 1: Isolating garment...');
-    garment = await isolateGarment(productBase64, productMimeType);
+    garment = await isolateGarment(productBase64, productMimeType, model);
     freshlyIsolated = true;
   }
 
@@ -229,7 +232,7 @@ export async function geminiTryOn(
       },
     ],
     generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
-  });
+  }, model);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const parts: any[] = result.candidates?.[0]?.content?.parts ?? [];
@@ -246,7 +249,7 @@ export async function geminiTryOn(
   return {
     data: imagePart.inlineData.data,
     mimeType: imagePart.inlineData.mimeType ?? 'image/jpeg',
-    model: TRYON_MODEL_FALLBACK,
+    model,
     isolatedGarment: freshlyIsolated ? garment : undefined,
   };
 }
