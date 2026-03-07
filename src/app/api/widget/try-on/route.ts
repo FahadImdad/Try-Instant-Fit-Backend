@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
     let resultMimeType: string;
     let isolatedGarmentResult: { data: string; mimeType: string } | undefined;
     let usedGarmentCache = false;
+    let usedGeminiModel: string | undefined;
 
     if (useFallback) {
       const productMimeType = (productResponse.headers.get('content-type') ?? 'image/jpeg').split(';')[0];
@@ -116,13 +117,14 @@ export async function POST(request: NextRequest) {
       resultBase64 = geminiResult.data;
       resultMimeType = geminiResult.mimeType;
       isolatedGarmentResult = geminiResult.isolatedGarment;
+      usedGeminiModel = geminiResult.model;
     } else {
       const vtResult = await virtualTryOn(userPhotoBase64, productBase64);
       resultBase64 = vtResult.data;
       resultMimeType = vtResult.mimeType;
     }
 
-    const aiModel = useFallback ? TRYON_MODEL_FALLBACK : TRYON_MODEL_PRIMARY;
+    const aiModel = useFallback ? (usedGeminiModel ?? TRYON_MODEL_FALLBACK) : TRYON_MODEL_PRIMARY;
     console.log('[try-on] Done.');
 
     // ── Upload result to Google Cloud Storage ───────────────────────────────
@@ -160,7 +162,16 @@ export async function POST(request: NextRequest) {
         result_image_url:   resultUrl,
         ai_model:           aiModel,
         processing_time_ms: processingTimeMs,
-        cost_usd:           useFallback ? (usedGarmentCache ? 0.04 : 0.08) : 0.04,
+        cost_usd:           useFallback
+          ? (() => {
+              const m = usedGeminiModel ?? '';
+              if (m.startsWith('imagen-4.0-ultra'))  return 0.06;                            // Imagen 4 Ultra: $0.06 flat
+              if (m.startsWith('imagen-4.0-fast'))   return 0.02;                            // Imagen 4 Fast: $0.02 flat
+              if (m.startsWith('imagen-4.0'))         return 0.04;                            // Imagen 4 Standard: $0.04 flat
+              if (m.includes('pro'))                  return usedGarmentCache ? 0.13 : 0.27; // Pro: $0.134 cached, $0.27 fresh
+              return usedGarmentCache ? 0.045 : 0.09;                                        // Flash: $0.045 cached, $0.09 fresh
+            })()
+          : 0.04,                                                                             // Virtual Try-On: $0.04 flat
         source:             'ghost-layer',
       })
       .then(({ error }) => {

@@ -3,7 +3,7 @@ import sharp from 'sharp';
 
 // ── Model names ────────────────────────────────────────────────────────────────
 export const TRYON_MODEL_PRIMARY  = 'virtual-try-on-001';           // Vertex AI — GA, stable, $0.04/try-on
-export const TRYON_MODEL_FALLBACK = 'gemini-3.1-flash-image-preview'; // Gemini — preview, ~$0.08/try-on
+export const TRYON_MODEL_FALLBACK = 'gemini-3.1-pro-image-preview';   // Gemini — best quality, ~$0.27/try-on
 
 const LOCATION = process.env.VERTEX_LOCATION ?? 'us-central1';
 const MAX_RETRIES = 3;
