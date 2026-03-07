@@ -9,8 +9,37 @@ export const maxDuration = 90;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+// ── IP Rate Limiting ─────────────────────────────────────────────────────────
+// Max 10 try-ons per IP per hour. Module-level — works within a warm Vercel instance.
+const ipTimestamps = new Map<string, number[]>();
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const cutoff = now - RATE_LIMIT_WINDOW_MS;
+  const times = (ipTimestamps.get(ip) ?? []).filter((t) => t > cutoff);
+  if (times.length >= RATE_LIMIT_MAX) return false;
+  times.push(now);
+  ipTimestamps.set(ip, times);
+  return true;
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
+
+  // ── Rate limit by IP ────────────────────────────────────────────────────────
+  const clientIp =
+    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
+
+  if (!checkRateLimit(clientIp)) {
+    return NextResponse.json(
+      { error: 'Too many try-ons. Please wait a bit before trying again.' },
+      { status: 429 }
+    );
+  }
 
   try {
     const formData = await request.formData();
