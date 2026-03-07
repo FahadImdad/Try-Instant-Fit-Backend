@@ -108,7 +108,7 @@ export async function GET(
       }
       const p = productMap.get(pid)!;
       p.tryon_count++;
-      if (p.recent_tryons.length < 6) {
+      if (p.recent_tryons.length < 12) {
         p.recent_tryons.push({ id: r.id, result_image_url: r.result_image_url, created_at: r.created_at });
       }
     }
