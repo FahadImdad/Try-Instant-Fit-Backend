@@ -193,11 +193,21 @@ export async function geminiTryOn(
   userPhotoBase64: string,
   userMimeType: string,
   productBase64: string,
-  productMimeType: string
-): Promise<{ data: string; mimeType: string; model: string }> {
-  // Step 1: Isolate the garment
-  console.log('[try-on] Fallback Step 1: Isolating garment...');
-  const isolatedGarment = await isolateGarment(productBase64, productMimeType);
+  productMimeType: string,
+  cachedGarment?: { data: string; mimeType: string }
+): Promise<{ data: string; mimeType: string; model: string; isolatedGarment?: { data: string; mimeType: string } }> {
+  let garment: { data: string; mimeType: string };
+  let freshlyIsolated = false;
+
+  if (cachedGarment) {
+    console.log('[try-on] Fallback: Using cached isolated garment, skipping Step 1.');
+    garment = cachedGarment;
+  } else {
+    console.log('[try-on] Fallback Step 1: Isolating garment...');
+    garment = await isolateGarment(productBase64, productMimeType);
+    freshlyIsolated = true;
+  }
+
   console.log('[try-on] Fallback Step 2: Applying garment to person...');
 
   // Step 2: Apply isolated garment to customer photo
@@ -211,7 +221,7 @@ export async function geminiTryOn(
         parts: [
           { text: `You will receive two images:\n\nIMAGE 1 — ISOLATED GARMENT (on white background, no person):\nUse this as your garment reference — its exact color, fabric, texture, collar, sleeves, buttons, and all design details.\n\nIMAGE 2 — CUSTOMER PHOTO (your canvas):\nPreserve EVERYTHING exactly: face, pose, body, background.\n\nTHE ONLY CHANGE: Replace the clothing in IMAGE 2 with the garment from IMAGE 1.\n\nOUTPUT: IMAGE 2 with only the clothing swapped. Everything else unchanged.` },
           { text: 'IMAGE 1 — ISOLATED GARMENT:' },
-          { inlineData: { data: isolatedGarment.data, mimeType: isolatedGarment.mimeType } },
+          { inlineData: { data: garment.data, mimeType: garment.mimeType } },
           { text: 'IMAGE 2 — CUSTOMER PHOTO:' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
           { text: 'Now output IMAGE 2 with only the clothing replaced by the garment from IMAGE 1. Face, pose, body, and background unchanged.' },
@@ -237,5 +247,6 @@ export async function geminiTryOn(
     data: imagePart.inlineData.data,
     mimeType: imagePart.inlineData.mimeType ?? 'image/jpeg',
     model: TRYON_MODEL_FALLBACK,
+    isolatedGarment: freshlyIsolated ? garment : undefined,
   };
 }

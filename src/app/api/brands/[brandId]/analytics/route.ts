@@ -75,10 +75,53 @@ export async function GET(
     // Recent try-ons
     const { data: recent } = await supabase
       .from('tryons')
-      .select('id, product_name, result_image_url, processing_time_ms, created_at')
+      .select('id, product_id, product_name, result_image_url, processing_time_ms, created_at, ai_model')
       .eq('brand_id', brandId)
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(50);
+
+    // Cached isolated garments per product
+    const { data: garments } = await supabase
+      .from('product_garments')
+      .select('product_id, isolated_garment_url, mime_type, created_at')
+      .eq('brand_id', brandId);
+
+    // Build per-product breakdown
+    const productMap = new Map<string, {
+      product_id: string;
+      product_name: string;
+      tryon_count: number;
+      isolated_garment_url: string | null;
+      recent_tryons: { id: string; result_image_url: string | null; created_at: string }[];
+    }>();
+
+    for (const r of (recent ?? [])) {
+      const pid = r.product_id ?? 'unknown';
+      if (!productMap.has(pid)) {
+        productMap.set(pid, {
+          product_id:            pid,
+          product_name:          r.product_name ?? pid,
+          tryon_count:           0,
+          isolated_garment_url:  null,
+          recent_tryons:         [],
+        });
+      }
+      const p = productMap.get(pid)!;
+      p.tryon_count++;
+      if (p.recent_tryons.length < 6) {
+        p.recent_tryons.push({ id: r.id, result_image_url: r.result_image_url, created_at: r.created_at });
+      }
+    }
+
+    // Attach isolated garment URLs
+    for (const g of (garments ?? [])) {
+      if (productMap.has(g.product_id)) {
+        productMap.get(g.product_id)!.isolated_garment_url = g.isolated_garment_url;
+      }
+    }
+
+    const products = Array.from(productMap.values())
+      .sort((a, b) => b.tryon_count - a.tryon_count);
 
     return NextResponse.json({
       brand,
@@ -90,7 +133,8 @@ export async function GET(
         avg_processing_ms,
         button_clicks: button_clicks ?? 0,
       },
-      recent: recent ?? [],
+      recent: (recent ?? []).slice(0, 20),
+      products,
     });
   } catch (error) {
     console.error('[analytics] Error:', error);

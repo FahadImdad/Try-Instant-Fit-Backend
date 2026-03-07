@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { virtualTryOn, geminiTryOn, TRYON_MODEL_PRIMARY, TRYON_MODEL_FALLBACK } from '@/lib/gemini';
-import { uploadTryOnResult } from '@/lib/storage';
+import { uploadTryOnResult, uploadIsolatedGarment } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 
 // 90s timeout — Virtual Try-On API can take up to ~60s
@@ -51,9 +51,44 @@ export async function POST(request: NextRequest) {
     const useFallback = provider === 'fallback';
     console.log(`[try-on] Using provider: ${useFallback ? 'fallback (Gemini)' : 'primary (Virtual Try-On)'}`);
 
-    const { data: resultBase64, mimeType: resultMimeType } = useFallback
-      ? await geminiTryOn(userPhotoBase64, userPhotoFile.type, productBase64, (productResponse.headers.get('content-type') ?? 'image/jpeg').split(';')[0])
-      : await virtualTryOn(userPhotoBase64, productBase64);
+    let resultBase64: string;
+    let resultMimeType: string;
+    let isolatedGarmentResult: { data: string; mimeType: string } | undefined;
+
+    if (useFallback) {
+      const productMimeType = (productResponse.headers.get('content-type') ?? 'image/jpeg').split(';')[0];
+
+      // ── Check for cached isolated garment ──────────────────────────────
+      let cachedGarment: { data: string; mimeType: string } | undefined;
+      if (productId) {
+        const { data: cacheRow } = await supabase
+          .from('product_garments')
+          .select('isolated_garment_url, mime_type')
+          .eq('product_id', productId)
+          .eq('brand_id', brandId)
+          .single();
+
+        if (cacheRow?.isolated_garment_url) {
+          try {
+            const resp = await fetch(cacheRow.isolated_garment_url);
+            if (resp.ok) {
+              const buf = Buffer.from(await resp.arrayBuffer());
+              cachedGarment = { data: buf.toString('base64'), mimeType: cacheRow.mime_type ?? 'image/jpeg' };
+              console.log('[try-on] Cache hit: using cached isolated garment for product:', productId);
+            }
+          } catch { /* ignore — will re-isolate */ }
+        }
+      }
+
+      const geminiResult = await geminiTryOn(userPhotoBase64, userPhotoFile.type, productBase64, productMimeType, cachedGarment);
+      resultBase64 = geminiResult.data;
+      resultMimeType = geminiResult.mimeType;
+      isolatedGarmentResult = geminiResult.isolatedGarment;
+    } else {
+      const vtResult = await virtualTryOn(userPhotoBase64, productBase64);
+      resultBase64 = vtResult.data;
+      resultMimeType = vtResult.mimeType;
+    }
 
     const aiModel = useFallback ? TRYON_MODEL_FALLBACK : TRYON_MODEL_PRIMARY;
     console.log('[try-on] Done.');
@@ -63,6 +98,25 @@ export async function POST(request: NextRequest) {
     const resultUrl = await uploadTryOnResult(resultBuffer, brandId, resultMimeType);
 
     const processingTimeMs = Date.now() - startTime;
+
+    // ── Cache isolated garment (fire-and-forget) ────────────────────────────
+    if (isolatedGarmentResult && productId) {
+      (async () => {
+        try {
+          const garmentBuffer = Buffer.from(isolatedGarmentResult!.data, 'base64');
+          const garmentUrl = await uploadIsolatedGarment(garmentBuffer, productId, isolatedGarmentResult!.mimeType);
+          await supabase.from('product_garments').upsert({
+            product_id:             productId,
+            brand_id:               brandId,
+            isolated_garment_url:   garmentUrl,
+            mime_type:              isolatedGarmentResult!.mimeType,
+          }, { onConflict: 'product_id,brand_id' });
+          console.log('[try-on] Cached isolated garment for product:', productId);
+        } catch (err) {
+          console.error('[try-on] Failed to cache garment:', err);
+        }
+      })();
+    }
 
     // ── Save to Supabase (fire-and-forget) ──────────────────────────────────
     supabase
