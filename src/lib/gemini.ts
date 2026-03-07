@@ -1,10 +1,12 @@
 import { GoogleAuth } from 'google-auth-library';
+import sharp from 'sharp';
 
 // ── Model names ────────────────────────────────────────────────────────────────
 export const TRYON_MODEL_PRIMARY  = 'virtual-try-on-001';           // Vertex AI — GA, stable, $0.04/try-on
 export const TRYON_MODEL_FALLBACK = 'gemini-3.1-flash-image-preview'; // Gemini — preview, $0.14/try-on
 
 const LOCATION = process.env.VERTEX_LOCATION ?? 'us-central1';
+const MAX_RETRIES = 3;
 
 // ── Auth ───────────────────────────────────────────────────────────────────────
 
@@ -21,17 +23,34 @@ async function getAccessToken(scope: string): Promise<string> {
   return token;
 }
 
+// ── Image preprocessing ────────────────────────────────────────────────────────
+// Normalizes any input photo to JPEG, max 1024px on longest side, good quality.
+// This ensures the API always gets a clean, consistent input regardless of what
+// the user uploaded (huge PNG, tiny JPEG, portrait, landscape, etc.)
+
+export async function preprocessImage(base64: string, mimeType: string): Promise<{ base64: string; mimeType: string }> {
+  const inputBuffer = Buffer.from(base64, 'base64');
+
+  const outputBuffer = await sharp(inputBuffer)
+    .rotate()                          // auto-rotate based on EXIF orientation
+    .resize(1024, 1024, {
+      fit: 'inside',                   // scale down only, never upscale
+      withoutEnlargement: true,
+    })
+    .jpeg({ quality: 92 })
+    .toBuffer();
+
+  return { base64: outputBuffer.toString('base64'), mimeType: 'image/jpeg' };
+}
+
 // ── PRIMARY: Google Virtual Try-On API (GA, stable, 1 call) ───────────────────
 
-export async function virtualTryOn(
+async function callVirtualTryOnOnce(
   personBase64: string,
-  garmentBase64: string
-): Promise<{ data: string; mimeType: string; model: string }> {
-  const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
-  if (!projectId) throw new Error('GOOGLE_CLOUD_PROJECT_ID is required');
-
-  const token = await getAccessToken('https://www.googleapis.com/auth/cloud-platform');
-
+  garmentBase64: string,
+  token: string,
+  projectId: string
+): Promise<{ data: string; mimeType: string }> {
   const url = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${LOCATION}/publishers/google/models/${TRYON_MODEL_PRIMARY}:predict`;
 
   const response = await fetch(url, {
@@ -49,10 +68,10 @@ export async function virtualTryOn(
       ],
       parameters: {
         sampleCount: 1,
-        baseSteps: 32,
+        baseSteps: 50,              // increased from 32 → better quality/consistency
         addWatermark: false,
         personGeneration: 'allow_adult',
-        outputOptions: { mimeType: 'image/jpeg', compressionQuality: 90 },
+        outputOptions: { mimeType: 'image/jpeg', compressionQuality: 92 },
       },
     }),
   });
@@ -70,11 +89,43 @@ export async function virtualTryOn(
     throw new Error('Virtual Try-On API returned no image');
   }
 
-  return {
-    data: prediction.bytesBase64Encoded,
-    mimeType: prediction.mimeType ?? 'image/jpeg',
-    model: TRYON_MODEL_PRIMARY,
-  };
+  return { data: prediction.bytesBase64Encoded, mimeType: prediction.mimeType ?? 'image/jpeg' };
+}
+
+export async function virtualTryOn(
+  personBase64: string,
+  garmentBase64: string
+): Promise<{ data: string; mimeType: string; model: string }> {
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
+  if (!projectId) throw new Error('GOOGLE_CLOUD_PROJECT_ID is required');
+
+  // Preprocess both images before sending
+  const [person, garment] = await Promise.all([
+    preprocessImage(personBase64, 'image/jpeg'),
+    preprocessImage(garmentBase64, 'image/jpeg'),
+  ]);
+
+  const token = await getAccessToken('https://www.googleapis.com/auth/cloud-platform');
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[try-on] Virtual Try-On attempt ${attempt}/${MAX_RETRIES}...`);
+      const result = await callVirtualTryOnOnce(person.base64, garment.base64, token, projectId);
+      console.log(`[try-on] Success on attempt ${attempt}`);
+      return { ...result, model: TRYON_MODEL_PRIMARY };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      console.warn(`[try-on] Attempt ${attempt} failed: ${lastError.message}`);
+      if (attempt < MAX_RETRIES) {
+        // short wait before retry
+        await new Promise(r => setTimeout(r, 1000 * attempt));
+      }
+    }
+  }
+
+  throw lastError ?? new Error('Virtual Try-On API failed after retries');
 }
 
 // ── FALLBACK: Gemini image generation (2 calls) ────────────────────────────────
