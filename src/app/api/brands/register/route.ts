@@ -71,30 +71,47 @@ export async function POST(request: NextRequest) {
     if (!contact_name?.trim()) {
       return NextResponse.json({ error: 'Your name is required' }, { status: 400, headers: CORS });
     }
+    if (!contact_position?.trim()) {
+      return NextResponse.json({ error: 'Your position is required' }, { status: 400, headers: CORS });
+    }
+    if (!contact_phone?.trim()) {
+      return NextResponse.json({ error: 'WhatsApp number is required' }, { status: 400, headers: CORS });
+    }
+    if (!website_url?.trim()) {
+      return NextResponse.json({ error: 'Website URL is required' }, { status: 400, headers: CORS });
+    }
+    if (!country?.trim()) {
+      return NextResponse.json({ error: 'Country is required' }, { status: 400, headers: CORS });
+    }
+    if (!logoFile || logoFile.size === 0) {
+      return NextResponse.json({ error: 'Brand logo is required' }, { status: 400, headers: CORS });
+    }
 
     // ── Validation ─────────────────────────────────────────────────────────
-    if (contact_phone?.trim()) {
-      const phone = contact_phone.trim();
-      if (!/^\+?[\d\s\-()]{7,25}$/.test(phone)) {
-        return NextResponse.json({ error: 'Phone number format is invalid' }, { status: 400, headers: CORS });
-      }
-      const digits = phone.replace(/\D/g, '');
-      if (digits.length < 7 || digits.length > 15) {
-        return NextResponse.json({ error: 'Phone number must be 7–15 digits' }, { status: 400, headers: CORS });
-      }
+    const phone = contact_phone.trim();
+    if (!/^\+?[\d\s\-()]{7,25}$/.test(phone)) {
+      return NextResponse.json({ error: 'Phone number format is invalid' }, { status: 400, headers: CORS });
     }
-    if (website_url?.trim()) {
-      try {
-        const parsed = new URL(website_url.trim());
-        if (!['http:', 'https:'].includes(parsed.protocol)) {
-          return NextResponse.json({ error: 'Website URL must start with http:// or https://' }, { status: 400, headers: CORS });
-        }
-      } catch {
-        return NextResponse.json({ error: 'Website URL is not valid' }, { status: 400, headers: CORS });
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+      return NextResponse.json({ error: 'Phone number must be 7–15 digits' }, { status: 400, headers: CORS });
+    }
+    try {
+      const parsed = new URL(website_url.trim());
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return NextResponse.json({ error: 'Website URL must start with http:// or https://' }, { status: 400, headers: CORS });
       }
+    } catch {
+      return NextResponse.json({ error: 'Website URL is not valid' }, { status: 400, headers: CORS });
     }
     if (primary_color && !/^#[0-9a-fA-F]{6}$/.test(primary_color)) {
       return NextResponse.json({ error: 'Brand color must be a 6-digit hex (e.g. #5a67f2)' }, { status: 400, headers: CORS });
+    }
+    if (!ALLOWED_LOGO_TYPES.includes(logoFile.type)) {
+      return NextResponse.json({ error: 'Logo must be JPEG, PNG, WebP, or SVG' }, { status: 400, headers: CORS });
+    }
+    if (logoFile.size > MAX_LOGO_SIZE) {
+      return NextResponse.json({ error: 'Logo must be 5MB or smaller' }, { status: 400, headers: CORS });
     }
 
     // Resolve email: prefer Google-verified token, fall back to plain field
@@ -158,23 +175,14 @@ export async function POST(request: NextRequest) {
       .single();
     if (brandError) throw brandError;
 
-    // Upload logo (best-effort)
+    // Upload logo (validated above — best-effort against storage errors)
     let logoUrl: string | null = null;
-    if (logoFile && logoFile.size > 0) {
-      if (!ALLOWED_LOGO_TYPES.includes(logoFile.type)) {
-        // Brand created — just skip logo upload
-        console.warn('[register] Invalid logo type:', logoFile.type);
-      } else if (logoFile.size > MAX_LOGO_SIZE) {
-        console.warn('[register] Logo too large:', logoFile.size);
-      } else {
-        try {
-          const buf = Buffer.from(await logoFile.arrayBuffer());
-          logoUrl = await uploadBrandLogo(buf, brand.id, logoFile.type);
-          await supabase.from('brands').update({ logo_url: logoUrl }).eq('id', brand.id);
-        } catch (e) {
-          console.error('[register] Logo upload failed:', e);
-        }
-      }
+    try {
+      const buf = Buffer.from(await logoFile.arrayBuffer());
+      logoUrl = await uploadBrandLogo(buf, brand.id, logoFile.type);
+      await supabase.from('brands').update({ logo_url: logoUrl }).eq('id', brand.id);
+    } catch (e) {
+      console.error('[register] Logo upload failed:', e);
     }
 
     // Default widget config
