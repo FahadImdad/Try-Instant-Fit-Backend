@@ -78,9 +78,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'price must be a non-negative number' }, { status: 400, headers: CORS });
     }
 
-    // Verify brand
-    const { data: brand } = await supabase.from('brands').select('id').eq('id', brandId).maybeSingle();
+    // Verify brand + check quota (image processing costs 1 try-on credit)
+    const { data: brand } = await supabase
+      .from('brands')
+      .select('id, tryon_credits, tryon_credits_used, unlimited')
+      .eq('id', brandId)
+      .maybeSingle();
     if (!brand) return NextResponse.json({ error: 'Brand not found' }, { status: 404, headers: CORS });
+
+    // If we'll process an image, the brand needs at least 1 credit
+    const willProcessImage = imageFile && imageFile.size > 0;
+    if (willProcessImage && !brand.unlimited) {
+      const remaining = (brand.tryon_credits || 0) - (brand.tryon_credits_used || 0);
+      if (remaining <= 0) {
+        return NextResponse.json(
+          { error: 'No credits remaining. Top up to add more products.', code: 'QUOTA_EXCEEDED' },
+          { status: 402, headers: CORS },
+        );
+      }
+    }
 
     // Process image if uploaded
     let imageUrl: string | null = null;
@@ -129,6 +145,30 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       })
       .select('*')
       .single();
+
+    // Charge 1 credit for image processing (only if isolation succeeded)
+    if (isolatedUrl && !brand.unlimited) {
+      await supabase
+        .from('brands')
+        .update({
+          tryon_credits_used: (brand.tryon_credits_used || 0) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', brandId);
+
+      // Log this as a tryons row so it's auditable in analytics
+      // (source='ghost-layer' since we don't have a 'setup' source enum yet)
+      await supabase.from('tryons').insert({
+        brand_id: brandId,
+        product_id: sku.trim(),
+        product_name: `[Setup] ${name.trim()}`,
+        result_image_url: isolatedUrl,
+        ai_model: ISOLATION_MODEL,
+        cost_usd: 0.045,
+        source: 'ghost-layer',
+        product_uuid: product?.id ?? null,
+      });
+    }
 
     if (error) {
       if ((error as { code?: string }).code === '23505') {

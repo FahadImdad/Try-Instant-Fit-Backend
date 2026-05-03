@@ -72,6 +72,42 @@ export async function uploadProductImage(
   return `https://storage.googleapis.com/${bucketName}/${fileName}?v=${Date.now()}`;
 }
 
+export async function uploadBrandLogo(
+  imageBuffer: Buffer,
+  brandId: string,
+  mimeType = 'image/png'
+): Promise<string> {
+  const bucketName = process.env.GOOGLE_CLOUD_BUCKET_NAME;
+  if (!bucketName) throw new Error('GOOGLE_CLOUD_BUCKET_NAME is required');
+  const ext = mimeType === 'image/svg+xml' ? 'svg' : mimeType === 'image/webp' ? 'webp' : mimeType === 'image/jpeg' ? 'jpg' : 'png';
+  const fileName = `brands/${brandId}/logo.${ext}`;
+  const bucket = getStorage().bucket(bucketName);
+  await bucket.file(fileName).save(imageBuffer, {
+    contentType: mimeType,
+    metadata: { cacheControl: 'public, max-age=31536000' },
+    public: true,
+  });
+  return `https://storage.googleapis.com/${bucketName}/${fileName}?v=${Date.now()}`;
+}
+
+export async function uploadPaymentScreenshot(
+  imageBuffer: Buffer,
+  brandId: string,
+  mimeType = 'image/jpeg'
+): Promise<string> {
+  const bucketName = process.env.GOOGLE_CLOUD_BUCKET_NAME;
+  if (!bucketName) throw new Error('GOOGLE_CLOUD_BUCKET_NAME is required');
+  const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+  const fileName = `topups/${brandId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const bucket = getStorage().bucket(bucketName);
+  await bucket.file(fileName).save(imageBuffer, {
+    contentType: mimeType,
+    metadata: { cacheControl: 'public, max-age=31536000' },
+    public: true,
+  });
+  return `https://storage.googleapis.com/${bucketName}/${fileName}`;
+}
+
 export async function uploadTryOnResult(
   imageBuffer: Buffer,
   brandId: string,
