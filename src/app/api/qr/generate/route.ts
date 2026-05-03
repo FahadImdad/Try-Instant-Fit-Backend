@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
 
     if (qrError) throw qrError;
 
-    const scanBase = process.env.PUBLIC_SCAN_BASE_URL || 'https://tryinstantfit.vercel.app';
+    const scanBase = process.env.PUBLIC_SCAN_BASE_URL || 'https://tryinstantfit.com';
     const scanUrl = `${scanBase}/scan.html?token=${token}`;
 
     return NextResponse.json(

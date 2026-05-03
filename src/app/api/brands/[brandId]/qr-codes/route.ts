@@ -52,7 +52,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    const scanBase = process.env.PUBLIC_SCAN_BASE_URL || 'https://tryinstantfit.vercel.app';
+    const scanBase = process.env.PUBLIC_SCAN_BASE_URL || 'https://tryinstantfit.com';
     const qrs = qrRows.map(q => ({
       ...q,
       active_passcodes: passcodeCounts[q.id] || 0,
