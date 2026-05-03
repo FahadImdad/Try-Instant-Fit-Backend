@@ -22,8 +22,10 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
     if (error) throw error;
 
-    // For each QR, count passcodes for the dashboard summary
-    const qrIds = (data ?? []).map(q => q.id);
+    const qrRows = data ?? [];
+    const qrIds = qrRows.map(q => q.id);
+
+    // For each QR, count active passcodes
     const passcodeCounts: Record<string, number> = {};
     if (qrIds.length > 0) {
       const { data: pcRows } = await supabase
@@ -36,10 +38,25 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       });
     }
 
+    // Fetch isolated garment URLs from product_garments for this brand's products
+    const productIds = Array.from(new Set(qrRows.map(q => q.product_id).filter(Boolean)));
+    const isolatedByProductId: Record<string, string> = {};
+    if (productIds.length > 0) {
+      const { data: garmentRows } = await supabase
+        .from('product_garments')
+        .select('product_id, isolated_garment_url')
+        .eq('brand_id', brandId)
+        .in('product_id', productIds);
+      garmentRows?.forEach(g => {
+        if (g.isolated_garment_url) isolatedByProductId[g.product_id] = g.isolated_garment_url;
+      });
+    }
+
     const scanBase = process.env.PUBLIC_SCAN_BASE_URL || 'https://tryinstantfit.vercel.app';
-    const qrs = (data ?? []).map(q => ({
+    const qrs = qrRows.map(q => ({
       ...q,
       active_passcodes: passcodeCounts[q.id] || 0,
+      isolated_garment_url: isolatedByProductId[q.product_id] || null,
       scan_url: `${scanBase}/scan.html?token=${q.token}`,
     }));
 
