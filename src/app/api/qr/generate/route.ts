@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
 
     // ── If image file uploaded, validate + push to GCS + pre-process garment ─
     let finalDisplayUrl: string | null = display_image_url?.trim() || null;
+    let isolatedGarmentUrl: string | null = null;
     let garmentIsolated = false;
     let isolationError: string | null = null;
 
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest) {
         const productBase64 = buf.toString('base64');
         const isolated = await isolateGarment(productBase64, imageFile.type, ISOLATION_MODEL);
         const isolatedBuf = Buffer.from(isolated.data, 'base64');
-        const garmentUrl = await uploadIsolatedGarment(isolatedBuf, cleanProductId, isolated.mimeType);
+        isolatedGarmentUrl = await uploadIsolatedGarment(isolatedBuf, cleanProductId, isolated.mimeType);
 
         // Cache in product_garments (keyed by product_id + brand_id)
         await supabase
@@ -134,7 +135,7 @@ export async function POST(request: NextRequest) {
           .upsert({
             product_id: cleanProductId,
             brand_id,
-            isolated_garment_url: garmentUrl,
+            isolated_garment_url: isolatedGarmentUrl,
             mime_type: isolated.mimeType,
           }, { onConflict: 'product_id,brand_id' });
 
@@ -178,6 +179,8 @@ export async function POST(request: NextRequest) {
         qr,
         scan_url: scanUrl,
         garment_isolated: garmentIsolated,
+        isolated_garment_url: isolatedGarmentUrl,
+        uploaded_image_url: finalDisplayUrl,
         isolation_error: isolationError,
       },
       { status: 201, headers: QR_CORS },
