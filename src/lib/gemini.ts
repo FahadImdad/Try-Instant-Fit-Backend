@@ -164,15 +164,17 @@ export async function isolateGarment(
         role: 'user',
         parts: [
           {
-            text: `This is a product catalog photo showing a garment worn by a model or mannequin.
+            text: `This is a product catalog photo showing a model or mannequin wearing one or more garments (an outfit).
 
-Your task: output an image of ONLY the garment item, completely isolated on a plain white background.
+Your task: output an image of the COMPLETE OUTFIT — every visible clothing item on the model — isolated together on a plain white background.
 - Remove the model/mannequin entirely — keep ONLY the clothing
 - Remove the background
-- Show the garment flat or as if on an invisible hanger, at full size
-- CRITICAL — preserve the EXACT color: if the garment is sky blue, it must be sky blue in the output. If it is maroon, it must be maroon. Do not lighten, darken, or shift the color at all.
-- Preserve all details exactly: fabric texture, collar style, sleeve length, buttons, embroidery, cut, and any patterns
-Output: just the garment on a white background with its exact original color and details intact.`,
+- KEEP EVERY garment piece visible in the photo: top, kameez, shirt, kurta, bottom, trousers, shalwar, pants, skirt, dupatta, scarf, jacket, vest, belt — all of them, arranged together in their natural relative positions (top above bottom, dupatta draped or alongside, etc.)
+- Do NOT drop, hide, or omit any clothing piece. If the model is wearing a 3-piece suit (kameez + shalwar + dupatta), output all three. If it's a 2-piece (top + bottom), output both.
+- Show the outfit flat or as if on an invisible hanger/dress form, at full size, with each piece clearly visible
+- CRITICAL — preserve the EXACT colors of every piece: if the kameez is sky blue and the dupatta is maroon, both must keep those exact colors in the output. Do not lighten, darken, or shift any color.
+- Preserve all details exactly: fabric texture, collar style, sleeve length, buttons, embroidery, prints, patterns, cut, and length — for every piece
+Output: the complete outfit (all clothing pieces together) on a white background, with every piece's exact original color and details intact.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
@@ -224,21 +226,21 @@ export async function geminiTryOn(
 
   console.log('[try-on] Fallback Step 2: Applying garment to person...');
 
-  // Step 2: Apply isolated garment to customer photo
+  // Step 2: Apply isolated outfit to customer photo
   const result = await callGemini({
     systemInstruction: {
-      parts: [{ text: `You are a photo editing AI that performs clothing swaps. You receive a customer photo and an isolated garment image (garment on white background, no person). Your job is to place the garment onto the customer exactly as they appear — preserving their face, body, pose, and background completely. You only change the clothing.` }],
+      parts: [{ text: `You are a photo editing AI that performs full-outfit clothing swaps. You receive a customer photo and an isolated-outfit image (one or more garments together on white background, no person). Your job is to dress the customer in the COMPLETE outfit — every piece shown — preserving their face, body, pose, and background completely. You only change the clothing.` }],
     },
     contents: [
       {
         role: 'user',
         parts: [
-          { text: `You will receive two images:\n\nIMAGE 1 — ISOLATED GARMENT (on white background, no person):\nUse this as your garment reference — its exact color, fabric, texture, collar, sleeves, buttons, and all design details.\n\nIMAGE 2 — CUSTOMER PHOTO (your canvas):\nPreserve EVERYTHING exactly: face, pose, body, background.\n\nTHE ONLY CHANGE: Replace the clothing in IMAGE 2 with the garment from IMAGE 1.\n\nOUTPUT: IMAGE 2 with only the clothing swapped. Everything else unchanged.` },
-          { text: 'IMAGE 1 — ISOLATED GARMENT:' },
+          { text: `You will receive two images:\n\nIMAGE 1 — ISOLATED OUTFIT (one or more garments on white background, no person):\nThis is the COMPLETE outfit — every garment shown (e.g. top + bottom, kameez + shalwar + dupatta, jacket + pants, etc.) must appear on the customer. Use this as your reference for exact colors, fabrics, textures, collars, sleeves, lengths, buttons, embroidery, prints, and all design details for every piece.\n\nIMAGE 2 — CUSTOMER PHOTO (your canvas):\nPreserve EVERYTHING exactly: face, pose, body, background.\n\nTHE ONLY CHANGE: Replace the customer's existing clothing in IMAGE 2 with the COMPLETE outfit from IMAGE 1. Apply every garment piece in its natural position (top on torso, bottom on legs, dupatta draped over shoulders/across body, etc.). Do not skip or omit any piece.\n\nOUTPUT: IMAGE 2 with the customer wearing the full outfit from IMAGE 1. Everything else (face, pose, body, background) unchanged.` },
+          { text: 'IMAGE 1 — ISOLATED OUTFIT (all pieces):' },
           { inlineData: { data: garment.data, mimeType: garment.mimeType } },
           { text: 'IMAGE 2 — CUSTOMER PHOTO:' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
-          { text: 'Now output IMAGE 2 with only the clothing replaced by the garment from IMAGE 1. Face, pose, body, and background unchanged.' },
+          { text: 'Now output IMAGE 2 with the customer dressed in the complete outfit from IMAGE 1 — every piece in IMAGE 1 must appear on the customer. Face, pose, body, and background unchanged.' },
         ],
       },
     ],
