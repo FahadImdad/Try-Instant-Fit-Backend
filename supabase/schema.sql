@@ -53,12 +53,35 @@ CREATE TABLE IF NOT EXISTS analytics_events (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ── Contact Submissions ─────────────────────────────────────────────────────
+-- Captures leads from the marketing site contact form before they become brands.
+CREATE TABLE IF NOT EXISTS contact_submissions (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name              TEXT NOT NULL,
+  email             TEXT NOT NULL,
+  brand_name        TEXT NOT NULL,
+  website_url       TEXT,
+  product_interest  TEXT
+                      CHECK (product_interest IN ('ghost-layer','scan-wear','digital-mirror','multiple','not-sure') OR product_interest IS NULL),
+  message           TEXT,
+  status            TEXT NOT NULL DEFAULT 'new'
+                      CHECK (status IN ('new','contacted','qualified','converted','rejected')),
+  source            TEXT NOT NULL DEFAULT 'website'
+                      CHECK (source IN ('website','whatsapp','email','referral')),
+  brand_id          UUID REFERENCES brands(id) ON DELETE SET NULL,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ── Indexes ──────────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_tryons_brand_id ON tryons(brand_id);
 CREATE INDEX IF NOT EXISTS idx_tryons_created_at ON tryons(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_analytics_brand_id ON analytics_events(brand_id);
 CREATE INDEX IF NOT EXISTS idx_analytics_event_name ON analytics_events(event_name);
 CREATE INDEX IF NOT EXISTS idx_analytics_created_at ON analytics_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_contact_submissions_email ON contact_submissions(email);
+CREATE INDEX IF NOT EXISTS idx_contact_submissions_status ON contact_submissions(status);
+CREATE INDEX IF NOT EXISTS idx_contact_submissions_created_at ON contact_submissions(created_at DESC);
 
 -- ── Demo Brand (for testing) ──────────────────────────────────────────────────
 INSERT INTO brands (id, name, email, website_url, status)
