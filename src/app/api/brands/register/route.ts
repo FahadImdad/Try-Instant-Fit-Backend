@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { OAuth2Client } from 'google-auth-library';
 import { supabase } from '@/lib/supabase';
 import { uploadBrandLogo } from '@/lib/storage';
 
@@ -13,11 +14,14 @@ const ALLOWED_LOGO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+
 
 /**
  * POST /api/brands/register
- * Public self-registration. Brand fills out details + uploads logo.
- * Creates brand with status='pending', tryon_credits=0.
+ * Public self-registration. Brand verifies via Google OAuth (preferred) OR
+ * provides email directly (legacy). Creates brand with status='pending',
+ * tryon_credits=0.
  *
  * Multipart form fields:
- *   name, email, website_url?, contact_phone?, country (PK default),
+ *   google_id_token? — if provided, email is extracted server-side
+ *   email? — fallback if no Google token
+ *   name, website_url?, contact_phone?, country (PK default),
  *   primary_color?, logo (file)
  */
 export async function POST(request: NextRequest) {
@@ -30,6 +34,7 @@ export async function POST(request: NextRequest) {
       const fd = await request.formData();
       logoFile = fd.get('logo') as File | null;
       body = {
+        google_id_token: fd.get('google_id_token'),
         name: fd.get('name'),
         email: fd.get('email'),
         website_url: fd.get('website_url'),
@@ -41,16 +46,44 @@ export async function POST(request: NextRequest) {
       body = await request.json();
     }
 
-    const { name, email, website_url, contact_phone, country, primary_color } = body as {
+    const { google_id_token, name, email: rawEmail, website_url, contact_phone, country, primary_color } = body as {
+      google_id_token?: string;
       name?: string; email?: string; website_url?: string; contact_phone?: string;
       country?: string; primary_color?: string;
     };
 
-    if (!name?.trim() || !email?.trim()) {
-      return NextResponse.json({ error: 'name and email are required' }, { status: 400, headers: CORS });
+    if (!name?.trim()) {
+      return NextResponse.json({ error: 'name is required' }, { status: 400, headers: CORS });
     }
 
-    const cleanEmail = email.toLowerCase().trim();
+    // Resolve email: prefer Google-verified token, fall back to plain field
+    let resolvedEmail: string | null = null;
+    if (google_id_token) {
+      const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+      if (!clientId) {
+        return NextResponse.json({ error: 'Google sign-in is not configured' }, { status: 500, headers: CORS });
+      }
+      try {
+        const client = new OAuth2Client(clientId);
+        const ticket = await client.verifyIdToken({ idToken: google_id_token, audience: clientId });
+        const payload = ticket.getPayload();
+        if (!payload?.email || !payload.email_verified) {
+          return NextResponse.json({ error: 'Google email not verified' }, { status: 400, headers: CORS });
+        }
+        resolvedEmail = payload.email.toLowerCase().trim();
+      } catch (err) {
+        console.error('[register] Invalid Google token:', err);
+        return NextResponse.json({ error: 'Invalid Google sign-in. Please retry.' }, { status: 401, headers: CORS });
+      }
+    } else if (rawEmail?.trim()) {
+      resolvedEmail = rawEmail.toLowerCase().trim();
+    }
+
+    if (!resolvedEmail) {
+      return NextResponse.json({ error: 'Sign in with Google or provide email' }, { status: 400, headers: CORS });
+    }
+
+    const cleanEmail = resolvedEmail;
 
     // Already registered?
     const { data: existing } = await supabase
