@@ -1,6 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+type Source = 'ghost-layer' | 'scan-wear' | 'digital-mirror';
+const SOURCES: Source[] = ['ghost-layer', 'scan-wear', 'digital-mirror'];
+
+interface SourceStats {
+  total: number;
+  today: number;
+  this_week: number;
+  this_month: number;
+  avg_processing_ms: number | null;
+  cost_usd_total: number;
+}
+
+interface ProductBreakdown {
+  product_id: string;
+  product_name: string;
+  source: Source;
+  tryon_count: number;
+  isolated_garment_url: string | null;
+  recent_tryons: { id: string; result_image_url: string | null; created_at: string }[];
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ brandId: string }> }
@@ -16,132 +43,193 @@ export async function GET(
       .single();
 
     if (!brand) {
-      return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Brand not found' }, { status: 404, headers: CORS_HEADERS });
     }
 
-    // Total try-ons
-    const { count: total } = await supabase
-      .from('tryons')
-      .select('*', { count: 'exact', head: true })
-      .eq('brand_id', brandId);
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - 7);
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
 
-    // Today's try-ons
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const { count: today } = await supabase
+    // ── Pull all try-ons for the brand (one query) and aggregate in code ─────
+    // We pull only the columns we need and accept that heavy brands may have many rows
+    // — at typical volumes (<50k/year) this is fine. Tightens N queries → 1.
+    const { data: allTryons } = await supabase
       .from('tryons')
-      .select('*', { count: 'exact', head: true })
+      .select('id, product_id, product_name, source, result_image_url, processing_time_ms, cost_usd, created_at, ai_model')
       .eq('brand_id', brandId)
-      .gte('created_at', todayStart.toISOString());
+      .order('created_at', { ascending: false });
 
-    // This week
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - 7);
-    const { count: this_week } = await supabase
-      .from('tryons')
-      .select('*', { count: 'exact', head: true })
-      .eq('brand_id', brandId)
-      .gte('created_at', weekStart.toISOString());
+    const tryons = allTryons ?? [];
 
-    // This month
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
-    const { count: this_month } = await supabase
-      .from('tryons')
-      .select('*', { count: 'exact', head: true })
-      .eq('brand_id', brandId)
-      .gte('created_at', monthStart.toISOString());
+    // ── Compute overall + per-source stats from in-memory rows ───────────────
+    function emptyStats(): SourceStats {
+      return {
+        total: 0,
+        today: 0,
+        this_week: 0,
+        this_month: 0,
+        avg_processing_ms: null,
+        cost_usd_total: 0,
+      };
+    }
 
-    // Button clicks (widget_opened events)
-    const { count: button_clicks } = await supabase
+    const overall = emptyStats();
+    const bySource: Record<Source, SourceStats> = {
+      'ghost-layer': emptyStats(),
+      'scan-wear': emptyStats(),
+      'digital-mirror': emptyStats(),
+    };
+
+    const procSamples: { all: number[]; bySource: Record<Source, number[]> } = {
+      all: [],
+      bySource: { 'ghost-layer': [], 'scan-wear': [], 'digital-mirror': [] },
+    };
+
+    for (const r of tryons) {
+      const src = (SOURCES.includes(r.source as Source) ? r.source : 'ghost-layer') as Source;
+      const ts = new Date(r.created_at);
+      const cost = Number(r.cost_usd ?? 0);
+
+      overall.total++;
+      bySource[src].total++;
+      if (ts >= todayStart) { overall.today++; bySource[src].today++; }
+      if (ts >= weekStart)  { overall.this_week++; bySource[src].this_week++; }
+      if (ts >= monthStart) { overall.this_month++; bySource[src].this_month++; }
+
+      overall.cost_usd_total += cost;
+      bySource[src].cost_usd_total += cost;
+
+      if (typeof r.processing_time_ms === 'number') {
+        procSamples.all.push(r.processing_time_ms);
+        procSamples.bySource[src].push(r.processing_time_ms);
+      }
+    }
+
+    function avg(arr: number[]) {
+      return arr.length ? Math.round(arr.reduce((s, v) => s + v, 0) / arr.length) : null;
+    }
+    overall.avg_processing_ms = avg(procSamples.all);
+    for (const s of SOURCES) bySource[s].avg_processing_ms = avg(procSamples.bySource[s]);
+
+    // Round costs to 4 decimals
+    overall.cost_usd_total = Math.round(overall.cost_usd_total * 10000) / 10000;
+    for (const s of SOURCES) bySource[s].cost_usd_total = Math.round(bySource[s].cost_usd_total * 10000) / 10000;
+
+    // ── Button clicks (Ghost Layer widget specific) ──────────────────────────
+    const { count: buttonClicks } = await supabase
       .from('analytics_events')
       .select('*', { count: 'exact', head: true })
       .eq('brand_id', brandId)
       .eq('event_name', 'tryon_opened');
 
-    // Avg processing time
-    const { data: timings } = await supabase
-      .from('tryons')
-      .select('processing_time_ms')
-      .eq('brand_id', brandId)
-      .not('processing_time_ms', 'is', null);
-
-    const avg_processing_ms =
-      timings?.length
-        ? Math.round(timings.reduce((s, r) => s + (r.processing_time_ms ?? 0), 0) / timings.length)
-        : null;
-
-    // Recent try-ons
-    const { data: recent } = await supabase
-      .from('tryons')
-      .select('id, product_id, product_name, result_image_url, processing_time_ms, created_at, ai_model')
-      .eq('brand_id', brandId)
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    // Cached isolated garments per product
+    // ── Cached garments ──────────────────────────────────────────────────────
     const { data: garments } = await supabase
       .from('product_garments')
       .select('product_id, isolated_garment_url, mime_type, created_at')
       .eq('brand_id', brandId);
 
-    // Build per-product breakdown
-    const productMap = new Map<string, {
-      product_id: string;
-      product_name: string;
-      tryon_count: number;
-      isolated_garment_url: string | null;
-      recent_tryons: { id: string; result_image_url: string | null; created_at: string }[];
-    }>();
+    const garmentByProductId: Record<string, string | null> = {};
+    for (const g of (garments ?? [])) garmentByProductId[g.product_id] = g.isolated_garment_url ?? null;
 
-    for (const r of (recent ?? [])) {
+    // ── Per-product breakdowns, grouped by source ────────────────────────────
+    const productMap = new Map<string, ProductBreakdown>();
+    for (const r of tryons) {
       const pid = r.product_id ?? 'unknown';
-      if (!productMap.has(pid)) {
-        productMap.set(pid, {
-          product_id:            pid,
-          product_name:          r.product_name ?? pid,
-          tryon_count:           0,
-          isolated_garment_url:  null,
-          recent_tryons:         [],
+      const src = (SOURCES.includes(r.source as Source) ? r.source : 'ghost-layer') as Source;
+      const key = `${src}:${pid}`;
+      if (!productMap.has(key)) {
+        productMap.set(key, {
+          product_id: pid,
+          product_name: r.product_name ?? pid,
+          source: src,
+          tryon_count: 0,
+          isolated_garment_url: garmentByProductId[pid] ?? null,
+          recent_tryons: [],
         });
       }
-      const p = productMap.get(pid)!;
+      const p = productMap.get(key)!;
       p.tryon_count++;
       if (p.recent_tryons.length < 12) {
         p.recent_tryons.push({ id: r.id, result_image_url: r.result_image_url, created_at: r.created_at });
       }
     }
+    const allProducts = Array.from(productMap.values()).sort((a, b) => b.tryon_count - a.tryon_count);
 
-    // Attach isolated garment URLs
-    for (const g of (garments ?? [])) {
-      if (productMap.has(g.product_id)) {
-        productMap.get(g.product_id)!.isolated_garment_url = g.isolated_garment_url;
-      }
-    }
+    // ── Scan & Wear specific (QRs + passcodes + scan events) ─────────────────
+    const [{ count: qrTotal }, { count: qrActive }, { count: passcodeTotal }, { count: scansTotal }] = await Promise.all([
+      supabase.from('qr_codes').select('*', { count: 'exact', head: true }).eq('brand_id', brandId),
+      supabase.from('qr_codes').select('*', { count: 'exact', head: true }).eq('brand_id', brandId).eq('active', true),
+      supabase.from('qr_passcodes').select('qr_id', { count: 'exact', head: true }).in('qr_id',
+        (await supabase.from('qr_codes').select('id').eq('brand_id', brandId)).data?.map(q => q.id) ?? ['00000000-0000-0000-0000-000000000000']
+      ),
+      supabase.from('qr_scans').select('id', { count: 'exact', head: true }).in('qr_id',
+        (await supabase.from('qr_codes').select('id').eq('brand_id', brandId)).data?.map(q => q.id) ?? ['00000000-0000-0000-0000-000000000000']
+      ),
+    ]);
 
-    const products = Array.from(productMap.values())
-      .sort((a, b) => b.tryon_count - a.tryon_count);
+    const recent = tryons.slice(0, 20).map(r => ({
+      id: r.id,
+      product_id: r.product_id,
+      product_name: r.product_name,
+      result_image_url: r.result_image_url,
+      processing_time_ms: r.processing_time_ms,
+      cost_usd: r.cost_usd,
+      source: r.source,
+      created_at: r.created_at,
+      ai_model: r.ai_model,
+    }));
 
     return NextResponse.json({
       brand,
       stats: {
-        total_tryons: total ?? 0,
-        today: today ?? 0,
-        this_week: this_week ?? 0,
-        this_month: this_month ?? 0,
-        avg_processing_ms,
-        button_clicks: button_clicks ?? 0,
+        total_tryons: overall.total,
+        today: overall.today,
+        this_week: overall.this_week,
+        this_month: overall.this_month,
+        avg_processing_ms: overall.avg_processing_ms,
+        button_clicks: buttonClicks ?? 0,
+        cost_usd_total: overall.cost_usd_total,
       },
-      recent: (recent ?? []).slice(0, 20),
-      products,
-    });
+      by_source: {
+        'ghost-layer': {
+          ...bySource['ghost-layer'],
+          button_clicks: buttonClicks ?? 0,
+          conversion_rate: buttonClicks ? Math.round((bySource['ghost-layer'].total / buttonClicks) * 1000) / 10 : null,
+          recent: recent.filter(r => r.source === 'ghost-layer').slice(0, 20),
+          products: allProducts.filter(p => p.source === 'ghost-layer'),
+        },
+        'scan-wear': {
+          ...bySource['scan-wear'],
+          recent: recent.filter(r => r.source === 'scan-wear').slice(0, 20),
+          products: allProducts.filter(p => p.source === 'scan-wear'),
+          qr_count: qrTotal ?? 0,
+          qr_active: qrActive ?? 0,
+          passcode_count: passcodeTotal ?? 0,
+          scans_total: scansTotal ?? 0,
+        },
+        'digital-mirror': {
+          ...bySource['digital-mirror'],
+          available: false, // not deployed for this brand
+          recent: recent.filter(r => r.source === 'digital-mirror').slice(0, 20),
+          products: allProducts.filter(p => p.source === 'digital-mirror'),
+        },
+      },
+      // Legacy fields (existing dashboard still reads these)
+      recent,
+      products: allProducts.map(p => ({
+        product_id: p.product_id,
+        product_name: p.product_name,
+        tryon_count: p.tryon_count,
+        isolated_garment_url: p.isolated_garment_url,
+        recent_tryons: p.recent_tryons,
+      })),
+    }, { headers: CORS_HEADERS });
   } catch (error) {
     console.error('[analytics] Error:', error);
-    return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500, headers: CORS_HEADERS });
   }
 }
 
 export async function OPTIONS() {
-  return new NextResponse(null, { status: 204 });
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
