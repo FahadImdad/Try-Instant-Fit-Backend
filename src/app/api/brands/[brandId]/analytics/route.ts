@@ -35,10 +35,10 @@ export async function GET(
   const { brandId } = await params;
 
   try {
-    // Brand info
+    // Brand info (incl. credit balance)
     const { data: brand } = await supabase
       .from('brands')
-      .select('id, name, email, website_url, status, created_at')
+      .select('id, name, email, website_url, status, tryon_credits, tryon_credits_used, price_per_tryon_usd, unlimited, created_at')
       .eq('id', brandId)
       .single();
 

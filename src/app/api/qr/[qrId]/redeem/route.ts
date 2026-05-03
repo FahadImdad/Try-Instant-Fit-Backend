@@ -28,13 +28,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { data: qr, error: qrError } = await supabase
       .from('qr_codes')
-      .select('id, requires_passcode, total_limit, total_used, expires_at, active')
+      .select('id, brand_id, requires_passcode, total_limit, total_used, expires_at, active')
       .eq('id', qrId)
       .maybeSingle();
 
     if (qrError) throw qrError;
     if (!qr || !qr.active) {
       return NextResponse.json({ allowed: false, reason: 'qr_not_found' }, { status: 404, headers: QR_CORS });
+    }
+
+    // Brand-level quota check (so customers don't waste an upload then fail)
+    const { data: brandQuota } = await supabase
+      .from('brands')
+      .select('tryon_credits, tryon_credits_used, unlimited')
+      .eq('id', qr.brand_id)
+      .maybeSingle();
+    if (brandQuota && !brandQuota.unlimited && (brandQuota.tryon_credits_used || 0) >= (brandQuota.tryon_credits || 0)) {
+      return NextResponse.json({ allowed: false, reason: 'service_unavailable' }, { status: 503, headers: QR_CORS });
     }
     if (qr.expires_at && new Date(qr.expires_at) < new Date()) {
       return NextResponse.json({ allowed: false, reason: 'qr_expired' }, { status: 410, headers: QR_CORS });

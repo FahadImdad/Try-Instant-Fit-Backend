@@ -43,6 +43,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Photo must be under 10MB' }, { status: 400 });
     }
 
+    // ── Quota pre-check: brand must have credits or be unlimited ────────────
+    const { data: brandQuota } = await supabase
+      .from('brands')
+      .select('tryon_credits, tryon_credits_used, unlimited')
+      .eq('id', brandId)
+      .maybeSingle();
+
+    if (!brandQuota) {
+      return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
+    }
+
+    const remaining = brandQuota.unlimited
+      ? null
+      : Math.max(0, (brandQuota.tryon_credits || 0) - (brandQuota.tryon_credits_used || 0));
+
+    if (!brandQuota.unlimited && remaining === 0) {
+      return NextResponse.json({
+        error: 'No try-on credits remaining. Please contact your brand admin to top up.',
+        code: 'QUOTA_EXCEEDED',
+        credits_total: brandQuota.tryon_credits || 0,
+        credits_used: brandQuota.tryon_credits_used || 0,
+      }, { status: 402 });
+    }
+
     // ── Convert user photo to base64 ────────────────────────────────────────
     const userPhotoBuffer = Buffer.from(await userPhotoFile.arrayBuffer());
     const userPhotoBase64 = userPhotoBuffer.toString('base64');
@@ -162,6 +186,17 @@ export async function POST(request: NextRequest) {
 
     const tryonId = tryonInsert.data?.id ?? null;
     if (tryonInsert.error) console.error('[try-on] Failed to save tryon record:', tryonInsert.error.message);
+
+    // ── Decrement brand credits (only on successful try-on) ────────────────
+    if (!brandQuota.unlimited) {
+      await supabase
+        .from('brands')
+        .update({
+          tryon_credits_used: (brandQuota.tryon_credits_used || 0) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', brandId);
+    }
 
     // ── Scan & Wear: bump counters + log scan ──────────────────────────────
     if (source === 'scan-wear' && qrId) {

@@ -3,15 +3,34 @@
 
 -- ── Brands ──────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS brands (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name         TEXT NOT NULL,
-  email        TEXT NOT NULL UNIQUE,
-  website_url  TEXT,
-  status       TEXT NOT NULL DEFAULT 'trial'
-                 CHECK (status IN ('trial', 'active', 'suspended', 'cancelled')),
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                  TEXT NOT NULL,
+  email                 TEXT NOT NULL UNIQUE,
+  website_url           TEXT,
+  status                TEXT NOT NULL DEFAULT 'trial'
+                          CHECK (status IN ('trial', 'active', 'suspended', 'cancelled')),
+  -- Per-brand credit / quota system (added 2026-05)
+  tryon_credits         INTEGER NOT NULL DEFAULT 0,
+  tryon_credits_used    INTEGER NOT NULL DEFAULT 0,
+  price_per_tryon_usd   NUMERIC(8,4) NOT NULL DEFAULT 0.125,  -- 8 try-ons per $1 default
+  unlimited             BOOLEAN NOT NULL DEFAULT FALSE,        -- partner / demo brands
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- ── Brand Credit Top-Ups (audit log) ────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS brand_credit_topups (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id      UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  credits_added INTEGER NOT NULL CHECK (credits_added > 0),
+  amount_usd    NUMERIC(10,2),
+  payment_ref   TEXT,
+  notes         TEXT,
+  added_by      TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_brand_credit_topups_brand_id ON brand_credit_topups(brand_id);
+CREATE INDEX IF NOT EXISTS idx_brand_credit_topups_created_at ON brand_credit_topups(created_at DESC);
 
 -- ── Widget Configs ───────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS widget_configs (
@@ -159,13 +178,14 @@ CREATE INDEX IF NOT EXISTS idx_contact_submissions_created_at ON contact_submiss
 CREATE INDEX IF NOT EXISTS idx_product_garments_brand_id ON product_garments(brand_id);
 
 -- ── Demo Brand (for testing) ──────────────────────────────────────────────────
-INSERT INTO brands (id, name, email, website_url, status)
+INSERT INTO brands (id, name, email, website_url, status, unlimited)
 VALUES (
   '00000000-0000-0000-0000-000000000001'::UUID,
   'Your Brand (Demo)',
   'demo@yourbrand.com',
   'https://client-tryinstantfit.vercel.app',
-  'active'
+  'active',
+  TRUE  -- demo brand has no quota
 ) ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO widget_configs (brand_id, button_text, button_color, button_position)
