@@ -53,7 +53,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ allowed: false, reason: 'qr_limit_reached' }, { status: 410, headers: QR_CORS });
     }
 
-    // Passcode-gated flow
+    // Passcode-gated flow — uses brand-wide brand_passcodes (any of the brand's passcodes works)
     if (qr.requires_passcode) {
       if (!passcode?.trim()) {
         return NextResponse.json(
@@ -63,9 +63,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       const { data: pc, error: pcError } = await supabase
-        .from('qr_passcodes')
+        .from('brand_passcodes')
         .select('id, code, use_limit, used_count, expires_at, active')
-        .eq('qr_id', qrId)
+        .eq('brand_id', qr.brand_id)
         .eq('code', passcode.trim().toUpperCase())
         .maybeSingle();
 

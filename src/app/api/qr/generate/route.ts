@@ -38,9 +38,9 @@ export async function POST(request: NextRequest) {
     if (contentType.includes('multipart/form-data')) {
       const fd = await request.formData();
       imageFile = fd.get('display_image') as File | null;
-      // Coerce form values into typed object
       body = {
         brand_id: fd.get('brand_id') as string | null,
+        product_uuid: fd.get('product_uuid') as string | null,
         product_id: fd.get('product_id') as string | null,
         product_name: fd.get('product_name') as string | null,
         display_image_url: fd.get('display_image_url') as string | null,
@@ -54,14 +54,16 @@ export async function POST(request: NextRequest) {
 
     const {
       brand_id,
-      product_id,
-      product_name,
+      product_uuid,
+      product_id: productIdInput,
+      product_name: productNameInput,
       display_image_url,
       requires_passcode,
       total_limit,
       expires_at,
     } = body as {
       brand_id?: string;
+      product_uuid?: string;
       product_id?: string;
       product_name?: string;
       display_image_url?: string;
@@ -70,9 +72,37 @@ export async function POST(request: NextRequest) {
       expires_at?: string;
     };
 
-    if (!brand_id || !product_id?.trim() || !product_name?.trim()) {
+    if (!brand_id) {
+      return NextResponse.json({ error: 'brand_id is required' }, { status: 400, headers: QR_CORS });
+    }
+
+    // Resolve product info: either from product_uuid (new flow) or product_id+name (legacy)
+    let product_id = productIdInput;
+    let product_name = productNameInput;
+    let resolvedDisplayUrl = display_image_url;
+    let resolvedIsolatedUrl: string | null = null;
+
+    if (product_uuid) {
+      const { data: prod } = await supabase
+        .from('products')
+        .select('sku, name, image_url, isolated_garment_url, brand_id')
+        .eq('id', product_uuid)
+        .maybeSingle();
+      if (!prod) {
+        return NextResponse.json({ error: 'Product not found' }, { status: 404, headers: QR_CORS });
+      }
+      if (prod.brand_id !== brand_id) {
+        return NextResponse.json({ error: 'Product belongs to a different brand' }, { status: 403, headers: QR_CORS });
+      }
+      product_id = prod.sku;
+      product_name = prod.name;
+      resolvedDisplayUrl = resolvedDisplayUrl || prod.image_url;
+      resolvedIsolatedUrl = prod.isolated_garment_url;
+    }
+
+    if (!product_id?.trim() || !product_name?.trim()) {
       return NextResponse.json(
-        { error: 'brand_id, product_id, and product_name are required' },
+        { error: 'product_uuid OR (product_id + product_name) are required' },
         { status: 400, headers: QR_CORS },
       );
     }
@@ -97,9 +127,9 @@ export async function POST(request: NextRequest) {
     }
 
     // ── If image file uploaded, validate + push to GCS + pre-process garment ─
-    let finalDisplayUrl: string | null = display_image_url?.trim() || null;
-    let isolatedGarmentUrl: string | null = null;
-    let garmentIsolated = false;
+    let finalDisplayUrl: string | null = resolvedDisplayUrl?.trim() || null;
+    let isolatedGarmentUrl: string | null = resolvedIsolatedUrl;
+    let garmentIsolated = !!resolvedIsolatedUrl;
     let isolationError: string | null = null;
 
     if (imageFile && imageFile.size > 0) {
@@ -161,6 +191,7 @@ export async function POST(request: NextRequest) {
         brand_id,
         product_id: product_id.trim(),
         product_name: product_name.trim(),
+        product_uuid: product_uuid || null,
         display_image_url: finalDisplayUrl,
         requires_passcode: !!requires_passcode,
         total_limit: total_limit ?? null,

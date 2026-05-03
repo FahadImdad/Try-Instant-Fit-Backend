@@ -19,13 +19,24 @@ export async function GET(request: NextRequest) {
 
     const { data: qr, error } = await supabase
       .from('qr_codes')
-      .select('id, token, brand_id, product_id, product_name, display_image_url, requires_passcode, total_limit, total_used, expires_at, active')
+      .select('id, token, brand_id, product_id, product_uuid, product_name, display_image_url, requires_passcode, total_limit, total_used, expires_at, active')
       .eq('token', token)
       .maybeSingle();
 
     if (error) throw error;
     if (!qr || !qr.active) {
       return NextResponse.json({ error: 'QR not found or inactive' }, { status: 404, headers: QR_CORS });
+    }
+
+    // Pull product detail (price, name) if linked
+    let product: { name: string; price: number | null; currency: string; image_url: string | null } | null = null;
+    if (qr.product_uuid) {
+      const { data: p } = await supabase
+        .from('products')
+        .select('name, price, currency, image_url')
+        .eq('id', qr.product_uuid)
+        .maybeSingle();
+      if (p) product = p;
     }
 
     if (qr.expires_at && new Date(qr.expires_at) < new Date()) {
@@ -48,8 +59,11 @@ export async function GET(request: NextRequest) {
         qr_id: qr.id,
         brand_id: qr.brand_id,
         product_id: qr.product_id,
-        product_name: qr.product_name,
-        display_image_url: qr.display_image_url,
+        product_uuid: qr.product_uuid,
+        product_name: product?.name || qr.product_name,
+        product_price: product?.price ?? null,
+        product_currency: product?.currency || null,
+        display_image_url: product?.image_url || qr.display_image_url,
         requires_passcode: qr.requires_passcode,
         remaining: qr.total_limit !== null ? Math.max(0, qr.total_limit - qr.total_used) : null,
         brand: brand ? { id: qr.brand_id, ...brand } : null,

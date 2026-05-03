@@ -1,0 +1,150 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
+import { uploadProductImage, uploadIsolatedGarment } from '@/lib/storage';
+import { isolateGarment } from '@/lib/gemini';
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const ISOLATION_MODEL = 'gemini-3.1-flash-image-preview';
+
+export const maxDuration = 90;
+
+interface RouteParams {
+  params: Promise<{ brandId: string }>;
+}
+
+/**
+ * GET /api/brands/[brandId]/products
+ * List all products for a brand.
+ */
+export async function GET(_request: NextRequest, { params }: RouteParams) {
+  try {
+    const { brandId } = await params;
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, sku, name, price, currency, description, image_url, isolated_garment_url, active, created_at')
+      .eq('brand_id', brandId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return NextResponse.json({ products: data ?? [] }, { status: 200, headers: CORS });
+  } catch (e) {
+    console.error('[products GET]', e);
+    return NextResponse.json({ error: 'Failed to load products' }, { status: 500, headers: CORS });
+  }
+}
+
+/**
+ * POST /api/brands/[brandId]/products
+ * Create a new product. Accepts multipart/form-data with optional image upload.
+ *
+ * Fields: sku, name, price, currency, description, image (file)
+ * If image uploaded → isolates garment via Gemini and caches to GCS for later try-ons.
+ */
+export async function POST(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { brandId } = await params;
+    const ct = request.headers.get('content-type') || '';
+    let body: Record<string, unknown> = {};
+    let imageFile: File | null = null;
+
+    if (ct.includes('multipart/form-data')) {
+      const fd = await request.formData();
+      imageFile = fd.get('image') as File | null;
+      body = {
+        sku: fd.get('sku'),
+        name: fd.get('name'),
+        price: fd.get('price') ? parseFloat(fd.get('price') as string) : null,
+        currency: (fd.get('currency') as string) || 'PKR',
+        description: fd.get('description'),
+      };
+    } else {
+      body = await request.json();
+    }
+
+    const { sku, name, price, currency, description } = body as {
+      sku?: string; name?: string; price?: number | null; currency?: string; description?: string;
+    };
+
+    if (!sku?.trim() || !name?.trim()) {
+      return NextResponse.json({ error: 'sku and name are required' }, { status: 400, headers: CORS });
+    }
+    if (price !== null && price !== undefined && (typeof price !== 'number' || price < 0)) {
+      return NextResponse.json({ error: 'price must be a non-negative number' }, { status: 400, headers: CORS });
+    }
+
+    // Verify brand
+    const { data: brand } = await supabase.from('brands').select('id').eq('id', brandId).maybeSingle();
+    if (!brand) return NextResponse.json({ error: 'Brand not found' }, { status: 404, headers: CORS });
+
+    // Process image if uploaded
+    let imageUrl: string | null = null;
+    let isolatedUrl: string | null = null;
+
+    if (imageFile && imageFile.size > 0) {
+      if (!ALLOWED_TYPES.includes(imageFile.type)) {
+        return NextResponse.json({ error: 'Image must be JPG, PNG, or WebP' }, { status: 400, headers: CORS });
+      }
+      if (imageFile.size > MAX_IMAGE_SIZE) {
+        return NextResponse.json({ error: 'Image must be under 10MB' }, { status: 400, headers: CORS });
+      }
+      const buf = Buffer.from(await imageFile.arrayBuffer());
+      imageUrl = await uploadProductImage(buf, brandId, sku.trim(), imageFile.type);
+
+      // Pre-process garment for AI try-on (best-effort)
+      try {
+        const productBase64 = buf.toString('base64');
+        const isolated = await isolateGarment(productBase64, imageFile.type, ISOLATION_MODEL);
+        const isolatedBuf = Buffer.from(isolated.data, 'base64');
+        isolatedUrl = await uploadIsolatedGarment(isolatedBuf, sku.trim(), isolated.mimeType);
+
+        // Also write into legacy product_garments cache so old try-on flow works
+        await supabase.from('product_garments').upsert({
+          product_id: sku.trim(),
+          brand_id: brandId,
+          isolated_garment_url: isolatedUrl,
+          mime_type: isolated.mimeType,
+        }, { onConflict: 'product_id,brand_id' });
+      } catch (err) {
+        console.error('[products POST] isolation failed (non-fatal):', err);
+      }
+    }
+
+    const { data: product, error } = await supabase
+      .from('products')
+      .insert({
+        brand_id: brandId,
+        sku: sku.trim(),
+        name: name.trim(),
+        price: price ?? null,
+        currency: currency || 'PKR',
+        description: description?.trim() || null,
+        image_url: imageUrl,
+        isolated_garment_url: isolatedUrl,
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      if ((error as { code?: string }).code === '23505') {
+        return NextResponse.json({ error: 'A product with this SKU already exists' }, { status: 409, headers: CORS });
+      }
+      throw error;
+    }
+
+    return NextResponse.json({ product }, { status: 201, headers: CORS });
+  } catch (e) {
+    console.error('[products POST]', e);
+    const msg = e instanceof Error ? e.message : 'Failed to create product';
+    return NextResponse.json({ error: msg }, { status: 500, headers: CORS });
+  }
+}
+
+export function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS });
+}

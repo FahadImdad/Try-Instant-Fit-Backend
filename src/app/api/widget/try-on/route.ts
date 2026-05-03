@@ -198,25 +198,57 @@ export async function POST(request: NextRequest) {
         .eq('id', brandId);
     }
 
-    // ── Scan & Wear: bump counters + log scan ──────────────────────────────
+    // ── Scan & Wear: bump counters + log scan + link tryon to passcode ─────
     if (source === 'scan-wear' && qrId) {
       try {
-        // Increment qr_codes.total_used
-        const { data: qr } = await supabase.from('qr_codes').select('total_used').eq('id', qrId).single();
+        // Increment qr_codes.total_used + grab product_uuid for the tryon link
+        const { data: qr } = await supabase
+          .from('qr_codes')
+          .select('total_used, product_uuid')
+          .eq('id', qrId)
+          .single();
         if (qr) {
-          await supabase.from('qr_codes').update({ total_used: (qr.total_used || 0) + 1 }).eq('id', qrId);
+          await supabase
+            .from('qr_codes')
+            .update({ total_used: (qr.total_used || 0) + 1 })
+            .eq('id', qrId);
         }
-        // Increment passcode used_count if provided
+
+        // Increment brand passcode used_count + link tryon to passcode/product
         if (passcodeId) {
-          const { data: pc } = await supabase.from('qr_passcodes').select('used_count').eq('id', passcodeId).single();
+          const { data: pc } = await supabase
+            .from('brand_passcodes')
+            .select('used_count')
+            .eq('id', passcodeId)
+            .single();
           if (pc) {
-            await supabase.from('qr_passcodes').update({ used_count: (pc.used_count || 0) + 1 }).eq('id', passcodeId);
+            await supabase
+              .from('brand_passcodes')
+              .update({ used_count: (pc.used_count || 0) + 1 })
+              .eq('id', passcodeId);
           }
+          // Link the just-inserted tryon back to the passcode for sales reporting
+          if (tryonId) {
+            await supabase
+              .from('tryons')
+              .update({
+                brand_passcode_id: passcodeId,
+                product_uuid: qr?.product_uuid ?? null,
+              })
+              .eq('id', tryonId);
+          }
+        } else if (tryonId && qr?.product_uuid) {
+          // No passcode but still link product_uuid for analytics
+          await supabase
+            .from('tryons')
+            .update({ product_uuid: qr.product_uuid })
+            .eq('id', tryonId);
         }
+
         // Log scan event
         await supabase.from('qr_scans').insert({
           qr_id: qrId,
-          passcode_id: passcodeId || null,
+          brand_passcode_id: passcodeId || null,
           tryon_id: tryonId,
           status: 'completed',
           completed_at: new Date().toISOString(),
