@@ -81,7 +81,8 @@ export async function POST(request: NextRequest) {
     if (qrError) throw qrError;
 
     // Construct the public scan URL — frontend will use this to render the QR image
-    const scanUrl = `${process.env.PUBLIC_SCAN_BASE_URL || 'https://tryinstantfit.vercel.app/scan'}/${token}`;
+    const scanBase = process.env.PUBLIC_SCAN_BASE_URL || 'https://tryinstantfit.vercel.app';
+    const scanUrl = `${scanBase}/scan.html?token=${token}`;
 
     return NextResponse.json(
       {

@@ -36,10 +36,11 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       });
     }
 
+    const scanBase = process.env.PUBLIC_SCAN_BASE_URL || 'https://tryinstantfit.vercel.app';
     const qrs = (data ?? []).map(q => ({
       ...q,
       active_passcodes: passcodeCounts[q.id] || 0,
-      scan_url: `${process.env.PUBLIC_SCAN_BASE_URL || 'https://tryinstantfit.vercel.app/scan'}/${q.token}`,
+      scan_url: `${scanBase}/scan.html?token=${q.token}`,
     }));
 
     return NextResponse.json({ qr_codes: qrs }, { status: 200, headers: QR_CORS });
