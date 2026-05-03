@@ -47,10 +47,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'QR has reached its try-on limit' }, { status: 410, headers: QR_CORS });
     }
 
-    // Fetch brand display info
+    // Fetch brand display info incl. logo
     const { data: brand } = await supabase
       .from('brands')
-      .select('name, website_url')
+      .select('name, website_url, logo_url, primary_color')
       .eq('id', qr.brand_id)
       .maybeSingle();
 
