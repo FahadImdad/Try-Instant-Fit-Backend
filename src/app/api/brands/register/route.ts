@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
         email: fd.get('email'),
         website_url: fd.get('website_url'),
         contact_phone: fd.get('contact_phone'),
+        contact_name: fd.get('contact_name'),
+        contact_position: fd.get('contact_position'),
         country: fd.get('country') || 'PK',
         primary_color: fd.get('primary_color') || '#5a67f2',
       };
@@ -46,14 +48,53 @@ export async function POST(request: NextRequest) {
       body = await request.json();
     }
 
-    const { google_id_token, name, email: rawEmail, website_url, contact_phone, country, primary_color } = body as {
+    const {
+      google_id_token,
+      name,
+      email: rawEmail,
+      website_url,
+      contact_phone,
+      contact_name,
+      contact_position,
+      country,
+      primary_color,
+    } = body as {
       google_id_token?: string;
       name?: string; email?: string; website_url?: string; contact_phone?: string;
+      contact_name?: string; contact_position?: string;
       country?: string; primary_color?: string;
     };
 
     if (!name?.trim()) {
-      return NextResponse.json({ error: 'name is required' }, { status: 400, headers: CORS });
+      return NextResponse.json({ error: 'Brand name is required' }, { status: 400, headers: CORS });
+    }
+    if (!contact_name?.trim()) {
+      return NextResponse.json({ error: 'Your name is required' }, { status: 400, headers: CORS });
+    }
+
+    // ── Validation ─────────────────────────────────────────────────────────
+    if (contact_phone?.trim()) {
+      const phone = contact_phone.trim();
+      if (!/^\+?[\d\s\-()]{7,25}$/.test(phone)) {
+        return NextResponse.json({ error: 'Phone number format is invalid' }, { status: 400, headers: CORS });
+      }
+      const digits = phone.replace(/\D/g, '');
+      if (digits.length < 7 || digits.length > 15) {
+        return NextResponse.json({ error: 'Phone number must be 7–15 digits' }, { status: 400, headers: CORS });
+      }
+    }
+    if (website_url?.trim()) {
+      try {
+        const parsed = new URL(website_url.trim());
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          return NextResponse.json({ error: 'Website URL must start with http:// or https://' }, { status: 400, headers: CORS });
+        }
+      } catch {
+        return NextResponse.json({ error: 'Website URL is not valid' }, { status: 400, headers: CORS });
+      }
+    }
+    if (primary_color && !/^#[0-9a-fA-F]{6}$/.test(primary_color)) {
+      return NextResponse.json({ error: 'Brand color must be a 6-digit hex (e.g. #5a67f2)' }, { status: 400, headers: CORS });
     }
 
     // Resolve email: prefer Google-verified token, fall back to plain field
@@ -106,6 +147,8 @@ export async function POST(request: NextRequest) {
         email: cleanEmail,
         website_url: website_url?.trim() || null,
         contact_phone: contact_phone?.trim() || null,
+        contact_name: contact_name?.trim() || null,
+        contact_position: contact_position?.trim() || null,
         country: country || 'PK',
         primary_color: primary_color || '#5a67f2',
         status: 'pending',
