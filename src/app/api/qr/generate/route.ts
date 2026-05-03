@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { generateToken, QR_CORS } from '@/lib/qr';
-import { uploadProductImage } from '@/lib/storage';
+import { uploadProductImage, uploadIsolatedGarment } from '@/lib/storage';
+import { isolateGarment } from '@/lib/gemini';
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+// Scan & Wear standardised on Flash 3.1 — same model used for customer try-ons.
+const ISOLATION_MODEL = 'gemini-3.1-flash-image-preview';
+
+// 90s — Gemini isolation can take ~10-30s
+export const maxDuration = 90;
 
 /**
  * POST /api/qr/generate
@@ -89,8 +96,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'brand_id not found' }, { status: 404, headers: QR_CORS });
     }
 
-    // ── If image file uploaded, validate + push to GCS ──────────────────────
+    // ── If image file uploaded, validate + push to GCS + pre-process garment ─
     let finalDisplayUrl: string | null = display_image_url?.trim() || null;
+    let garmentIsolated = false;
+    let isolationError: string | null = null;
+
     if (imageFile && imageFile.size > 0) {
       if (!ALLOWED_TYPES.includes(imageFile.type)) {
         return NextResponse.json(
@@ -105,7 +115,34 @@ export async function POST(request: NextRequest) {
         );
       }
       const buf = Buffer.from(await imageFile.arrayBuffer());
-      finalDisplayUrl = await uploadProductImage(buf, brand_id, product_id.trim(), imageFile.type);
+      const cleanProductId = product_id.trim();
+
+      // 1) Upload customer-facing display image
+      finalDisplayUrl = await uploadProductImage(buf, brand_id, cleanProductId, imageFile.type);
+
+      // 2) Pre-process: isolate the garment ONCE upfront so every customer try-on is 1 AI call.
+      //    Best-effort — if it fails, the first customer scan will fall back to isolating then.
+      try {
+        const productBase64 = buf.toString('base64');
+        const isolated = await isolateGarment(productBase64, imageFile.type, ISOLATION_MODEL);
+        const isolatedBuf = Buffer.from(isolated.data, 'base64');
+        const garmentUrl = await uploadIsolatedGarment(isolatedBuf, cleanProductId, isolated.mimeType);
+
+        // Cache in product_garments (keyed by product_id + brand_id)
+        await supabase
+          .from('product_garments')
+          .upsert({
+            product_id: cleanProductId,
+            brand_id,
+            isolated_garment_url: garmentUrl,
+            mime_type: isolated.mimeType,
+          }, { onConflict: 'product_id,brand_id' });
+
+        garmentIsolated = true;
+      } catch (e) {
+        isolationError = e instanceof Error ? e.message : String(e);
+        console.error('[qr/generate] Garment isolation failed (will fall back on first scan):', isolationError);
+      }
     }
 
     // Generate unique token (retry if collision — extremely unlikely with 60 bits)
@@ -137,7 +174,12 @@ export async function POST(request: NextRequest) {
     const scanUrl = `${scanBase}/scan.html?token=${token}`;
 
     return NextResponse.json(
-      { qr, scan_url: scanUrl },
+      {
+        qr,
+        scan_url: scanUrl,
+        garment_isolated: garmentIsolated,
+        isolation_error: isolationError,
+      },
       { status: 201, headers: QR_CORS },
     );
   } catch (error) {

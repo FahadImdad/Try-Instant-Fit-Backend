@@ -153,7 +153,7 @@ async function callGemini(requestBody: object, model = TRYON_MODEL_FALLBACK): Pr
   return response.json();
 }
 
-async function isolateGarment(
+export async function isolateGarment(
   productBase64: string,
   productMimeType: string,
   model = TRYON_MODEL_FALLBACK
