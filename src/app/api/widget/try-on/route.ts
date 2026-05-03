@@ -25,6 +25,13 @@ export async function POST(request: NextRequest) {
     const outputResolution   = formData.get('output_resolution')  as string | null;
     const maxDim = outputResolution ? parseInt(outputResolution, 10) : 1024;
 
+    // ── Scan & Wear context (optional) ──────────────────────────────────────
+    const sourceParam = (formData.get('source') as string | null)?.trim() || 'ghost-layer';
+    const source: 'ghost-layer' | 'scan-wear' | 'digital-mirror' =
+      sourceParam === 'scan-wear' || sourceParam === 'digital-mirror' ? sourceParam : 'ghost-layer';
+    const qrId       = formData.get('qr_id')        as string | null;
+    const passcodeId = formData.get('passcode_id')  as string | null;
+
     // ── Validation ──────────────────────────────────────────────────────────
     if (!userPhotoFile)   return NextResponse.json({ error: 'user_photo is required' },        { status: 400 });
     if (!productImageUrl) return NextResponse.json({ error: 'product_image_url is required' }, { status: 400 });
@@ -125,8 +132,9 @@ export async function POST(request: NextRequest) {
       })();
     }
 
-    // ── Save to Supabase (fire-and-forget) ──────────────────────────────────
-    supabase
+    // ── Save to Supabase ────────────────────────────────────────────────────
+    // For Scan & Wear we need the inserted row's id to link in qr_scans, so we await.
+    const tryonInsert = await supabase
       .from('tryons')
       .insert({
         brand_id:           brandId,
@@ -139,20 +147,49 @@ export async function POST(request: NextRequest) {
           ? (() => {
               const m = usedGeminiModel ?? '';
               const r = maxDim; // 512 | 1024 | 2048 | 4096
-              // Cost per output image by model & resolution (from Google pricing)
               const perImg = m.includes('pro')
-                ? (r <= 512 ? 0.134 : r <= 1024 ? 0.134 : r <= 2048 ? 0.134 : 0.24)  // Pro: flat $0.134 up to 2K, $0.24 at 4K
+                ? (r <= 512 ? 0.134 : r <= 1024 ? 0.134 : r <= 2048 ? 0.134 : 0.24)
                 : m.includes('2.5-flash')
-                  ? (r <= 512 ? 0.022 : r <= 1024 ? 0.034 : r <= 2048 ? 0.050 : 0.076) // Flash 2.5
-                  : (r <= 512 ? 0.045 : r <= 1024 ? 0.067 : r <= 2048 ? 0.101 : 0.151); // Flash 3.1
-              return usedGarmentCache ? perImg : perImg * 2; // cached=1 call, fresh=2 calls
+                  ? (r <= 512 ? 0.022 : r <= 1024 ? 0.034 : r <= 2048 ? 0.050 : 0.076)
+                  : (r <= 512 ? 0.045 : r <= 1024 ? 0.067 : r <= 2048 ? 0.101 : 0.151);
+              return usedGarmentCache ? perImg : perImg * 2;
             })()
-          : 0.04,                                                                         // Virtual Try-On: $0.04 flat
-        source:             'ghost-layer',
+          : 0.04,
+        source,
       })
-      .then(({ error }) => {
-        if (error) console.error('[try-on] Failed to save tryon record:', error.message);
-      });
+      .select('id')
+      .single();
+
+    const tryonId = tryonInsert.data?.id ?? null;
+    if (tryonInsert.error) console.error('[try-on] Failed to save tryon record:', tryonInsert.error.message);
+
+    // ── Scan & Wear: bump counters + log scan ──────────────────────────────
+    if (source === 'scan-wear' && qrId) {
+      try {
+        // Increment qr_codes.total_used
+        const { data: qr } = await supabase.from('qr_codes').select('total_used').eq('id', qrId).single();
+        if (qr) {
+          await supabase.from('qr_codes').update({ total_used: (qr.total_used || 0) + 1 }).eq('id', qrId);
+        }
+        // Increment passcode used_count if provided
+        if (passcodeId) {
+          const { data: pc } = await supabase.from('qr_passcodes').select('used_count').eq('id', passcodeId).single();
+          if (pc) {
+            await supabase.from('qr_passcodes').update({ used_count: (pc.used_count || 0) + 1 }).eq('id', passcodeId);
+          }
+        }
+        // Log scan event
+        await supabase.from('qr_scans').insert({
+          qr_id: qrId,
+          passcode_id: passcodeId || null,
+          tryon_id: tryonId,
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.error('[try-on] Scan & Wear bookkeeping failed:', e instanceof Error ? e.message : String(e));
+      }
+    }
 
     return NextResponse.json({
       result_url:         resultUrl,

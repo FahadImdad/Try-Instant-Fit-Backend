@@ -46,12 +46,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         qr_id: qr.id,
+        brand_id: qr.brand_id,
         product_id: qr.product_id,
         product_name: qr.product_name,
         display_image_url: qr.display_image_url,
         requires_passcode: qr.requires_passcode,
         remaining: qr.total_limit !== null ? Math.max(0, qr.total_limit - qr.total_used) : null,
-        brand: brand ?? null,
+        brand: brand ? { id: qr.brand_id, ...brand } : null,
       },
       { status: 200, headers: QR_CORS },
     );
