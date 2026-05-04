@@ -72,7 +72,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const newCredits = (brand.tryon_credits || 0) + req.credits_requested;
-    const newStatus = brand.status === 'pending' ? 'active' : brand.status;
+    // Flip 'pending' (and legacy 'trial') brands to 'active' on first
+    // approved top-up. The 'trial' status has been retired going forward.
+    const newStatus = (brand.status === 'pending' || brand.status === 'trial') ? 'active' : brand.status;
 
     await supabase
       .from('brands')

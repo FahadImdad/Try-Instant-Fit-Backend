@@ -23,14 +23,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ brand_id: existing.id, name: existing.name, existing: true });
     }
 
-    // Create brand
+    // Create brand. Status starts as 'pending' (no credits yet) and is
+    // flipped to 'active' the first time admin approves a top-up. The
+    // 'trial' status has been retired.
     const { data: brand, error: brandError } = await supabase
       .from('brands')
       .insert({
         name: name.trim(),
         email: cleanEmail,
         website_url: website_url?.trim() || null,
-        status: 'trial',
+        status: 'pending',
       })
       .select('id, name')
       .single();

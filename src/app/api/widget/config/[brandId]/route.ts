@@ -22,6 +22,10 @@ export async function GET(
       .eq('id', brandId)
       .single();
 
+    // Active is the only status that gates the widget on. Brands that
+    // haven't paid yet sit at 'pending' until admin approves a top-up.
+    // Legacy 'trial' brands are accepted too for backwards compatibility
+    // until they get their first top-up approved (which flips them).
     if (!brand || (brand.status !== 'active' && brand.status !== 'trial')) {
       return NextResponse.json({ enabled: false });
     }

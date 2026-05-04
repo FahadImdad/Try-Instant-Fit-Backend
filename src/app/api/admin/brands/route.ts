@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       name,
       email,
       website_url,
-      status = 'trial',
+      status = 'pending',
       initial_credits = 0,
       price_per_tryon_usd = 0.125,
       unlimited = false,
