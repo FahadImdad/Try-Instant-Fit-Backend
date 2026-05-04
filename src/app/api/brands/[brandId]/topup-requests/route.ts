@@ -37,35 +37,71 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
 /**
  * POST /api/brands/[brandId]/topup-requests
- * Brand submits a top-up request with payment screenshot.
  *
- * Multipart fields:
- *   amount_usd (required, what they're paying in USD-equivalent)
- *   amount_local (optional, what they paid in local currency e.g. PKR)
- *   local_currency (optional, e.g. 'PKR')
- *   credits_requested (required, computed from amount_usd / brand.price_per_tryon_usd)
- *   payment_method (required: bank_transfer | jazzcash | easypaisa | card)
- *   payment_ref (optional, transaction id)
- *   notes (optional)
- *   screenshot (file, required)
+ * The brand creates a pending top-up request that admin will review.
+ *
+ * Two flows are supported:
+ *
+ * 1. WHATSAPP RECEIPT FLOW (preferred, current dashboard behaviour):
+ *    Brand picks credit count -> dashboard generates a receipt and opens
+ *    wa.me with a pre-filled message. Right before opening WhatsApp it
+ *    POSTs JSON here so the request shows up as "pending" in admin.
+ *    No screenshot, no payment_method needed — payment + screenshot are
+ *    handled out-of-band on WhatsApp.
+ *    Accepts both application/json and multipart/form-data.
+ *
+ * 2. LEGACY SCREENSHOT FLOW (older dashboard/admin):
+ *    Brand pays, uploads the screenshot in-page, picks payment_method.
+ *    multipart/form-data with `screenshot` and `payment_method` fields.
+ *
+ * Required fields (both flows):
+ *   amount_usd          number, > 0
+ *   credits_requested   integer, > 0
+ *
+ * Optional fields:
+ *   amount_local, local_currency, payment_method (defaults to 'whatsapp'
+ *   when no screenshot is uploaded), payment_ref, notes, receipt_id,
+ *   screenshot (file).
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { brandId } = await params;
     const ct = request.headers.get('content-type') || '';
-    if (!ct.includes('multipart/form-data')) {
-      return NextResponse.json({ error: 'multipart/form-data required' }, { status: 400, headers: CORS });
-    }
-    const fd = await request.formData();
 
-    const amountUsd = parseFloat(fd.get('amount_usd') as string);
-    const amountLocal = fd.get('amount_local') ? parseFloat(fd.get('amount_local') as string) : null;
-    const localCurrency = (fd.get('local_currency') as string) || null;
-    const creditsRequested = parseInt(fd.get('credits_requested') as string, 10);
-    const paymentMethod = fd.get('payment_method') as string;
-    const paymentRef = fd.get('payment_ref') as string;
-    const notes = fd.get('notes') as string;
-    const screenshot = fd.get('screenshot') as File | null;
+    let amountUsd: number;
+    let amountLocal: number | null = null;
+    let localCurrency: string | null = null;
+    let creditsRequested: number;
+    let paymentMethod: string | null = null;
+    let paymentRef: string | null = null;
+    let notes: string | null = null;
+    let receiptId: string | null = null;
+    let screenshot: File | null = null;
+
+    if (ct.includes('application/json')) {
+      const body = await request.json();
+      amountUsd        = parseFloat(String(body.amount_usd));
+      amountLocal      = body.amount_local != null ? parseFloat(String(body.amount_local)) : null;
+      localCurrency    = body.local_currency ?? null;
+      creditsRequested = parseInt(String(body.credits_requested), 10);
+      paymentMethod    = body.payment_method ?? null;
+      paymentRef       = body.payment_ref ?? null;
+      notes            = body.notes ?? null;
+      receiptId        = body.receipt_id ?? null;
+    } else if (ct.includes('multipart/form-data')) {
+      const fd = await request.formData();
+      amountUsd        = parseFloat(fd.get('amount_usd') as string);
+      amountLocal      = fd.get('amount_local') ? parseFloat(fd.get('amount_local') as string) : null;
+      localCurrency    = (fd.get('local_currency') as string) || null;
+      creditsRequested = parseInt(fd.get('credits_requested') as string, 10);
+      paymentMethod    = (fd.get('payment_method') as string) || null;
+      paymentRef       = (fd.get('payment_ref') as string) || null;
+      notes            = (fd.get('notes') as string) || null;
+      receiptId        = (fd.get('receipt_id') as string) || null;
+      screenshot       = fd.get('screenshot') as File | null;
+    } else {
+      return NextResponse.json({ error: 'Content-Type must be application/json or multipart/form-data' }, { status: 400, headers: CORS });
+    }
 
     if (isNaN(amountUsd) || amountUsd <= 0) {
       return NextResponse.json({ error: 'Valid amount_usd required' }, { status: 400, headers: CORS });
@@ -73,15 +109,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (isNaN(creditsRequested) || creditsRequested <= 0) {
       return NextResponse.json({ error: 'Valid credits_requested required' }, { status: 400, headers: CORS });
     }
-    if (!paymentMethod) {
-      return NextResponse.json({ error: 'payment_method is required' }, { status: 400, headers: CORS });
-    }
 
     // Verify brand
     const { data: brand } = await supabase.from('brands').select('id').eq('id', brandId).maybeSingle();
     if (!brand) return NextResponse.json({ error: 'Brand not found' }, { status: 404, headers: CORS });
 
-    // Upload screenshot
+    // Upload screenshot (legacy flow only)
     let screenshotUrl: string | null = null;
     if (screenshot && screenshot.size > 0) {
       if (!ALLOWED_TYPES.includes(screenshot.type)) {
@@ -92,9 +125,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
       const buf = Buffer.from(await screenshot.arrayBuffer());
       screenshotUrl = await uploadPaymentScreenshot(buf, brandId, screenshot.type);
-    } else {
-      return NextResponse.json({ error: 'Payment screenshot is required' }, { status: 400, headers: CORS });
     }
+
+    // Default payment method when none provided (WhatsApp receipt flow)
+    const finalPaymentMethod = paymentMethod?.trim() || 'whatsapp';
+
+    // Pack receipt_id into notes when present so admins can match the
+    // dashboard receipt to the pending request without a schema change.
+    const finalNotes = receiptId
+      ? `Receipt: ${receiptId}${notes ? ' — ' + notes : ''}`
+      : (notes?.trim() || null);
 
     const { data, error } = await supabase
       .from('credit_topup_requests')
@@ -105,9 +145,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         local_currency: localCurrency,
         credits_requested: creditsRequested,
         payment_screenshot_url: screenshotUrl,
-        payment_method: paymentMethod,
+        payment_method: finalPaymentMethod,
         payment_ref: paymentRef?.trim() || null,
-        notes: notes?.trim() || null,
+        notes: finalNotes,
         status: 'pending',
       })
       .select('*')
