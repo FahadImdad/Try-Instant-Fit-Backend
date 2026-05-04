@@ -20,10 +20,11 @@ export async function POST(request: NextRequest) {
     const brandId         = formData.get('brand_id')          as string | null;
     const productId       = formData.get('product_id')        as string | null;
     const productName     = formData.get('product_name')      as string | null;
-    const geminiModel        = formData.get('gemini_model')       as string | null;
     const outputResolution   = formData.get('output_resolution')  as string | null;
     // Default 512 (fastest + cheapest). Caller can override per-request.
     const maxDim = outputResolution ? parseInt(outputResolution, 10) : 512;
+    // Model is locked to TRYON_MODEL_FALLBACK (gemini-3.1-flash-image-preview);
+    // any `gemini_model` form field from the client is ignored on purpose.
 
     // ── Scan & Wear context (optional) ──────────────────────────────────────
     const sourceParam = (formData.get('source') as string | null)?.trim() || 'ghost-layer';
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
       productBase64,
       productMimeType,
       cachedGarment,
-      geminiModel ?? undefined,
+      TRYON_MODEL_FALLBACK,  // locked — do not accept overrides from the client
       maxDim
     );
     const resultBase64 = geminiResult.data;

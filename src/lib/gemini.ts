@@ -202,29 +202,27 @@ export async function geminiTryOn(
   model = TRYON_MODEL_FALLBACK,
   maxDim = 512
 ): Promise<{ data: string; mimeType: string; model: string; isolatedGarment?: { data: string; mimeType: string } }> {
-  // Preprocess user photo to target resolution before sending to Gemini
-  const [userPhoto, productImg] = await Promise.all([
-    preprocessImage(userPhotoBase64, userMimeType, maxDim),
-    preprocessImage(productBase64, productMimeType, maxDim),
-  ]);
+  // Preprocess each image at most once. The user photo is always needed
+  // for step 2. The product image is only needed for step 1 (garment
+  // isolation) — when we have a cached garment we skip preprocessing it.
+  const userPhoto = await preprocessImage(userPhotoBase64, userMimeType, maxDim);
   userPhotoBase64 = userPhoto.base64;
   userMimeType = userPhoto.mimeType;
-  productBase64 = productImg.base64;
-  productMimeType = productImg.mimeType;
 
   let garment: { data: string; mimeType: string };
   let freshlyIsolated = false;
 
   if (cachedGarment) {
-    console.log('[try-on] Fallback: Using cached isolated garment, skipping Step 1.');
+    console.log('[try-on] Using cached isolated garment, skipping Step 1.');
     garment = cachedGarment;
   } else {
-    console.log('[try-on] Fallback Step 1: Isolating garment...');
-    garment = await isolateGarment(productBase64, productMimeType, model);
+    console.log('[try-on] Step 1: Preprocessing product + isolating garment...');
+    const productImg = await preprocessImage(productBase64, productMimeType, maxDim);
+    garment = await isolateGarment(productImg.base64, productImg.mimeType, model);
     freshlyIsolated = true;
   }
 
-  console.log('[try-on] Fallback Step 2: Applying garment to person...');
+  console.log('[try-on] Step 2: Applying garment to person...');
 
   // Step 2: Apply isolated outfit to customer photo
   const result = await callGemini({
