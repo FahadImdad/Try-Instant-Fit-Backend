@@ -35,10 +35,11 @@ export async function GET(
   const { brandId } = await params;
 
   try {
-    // Brand info (incl. credit balance)
+    // Brand info (incl. credit balance + profile fields the dashboard's
+    // Edit Profile modal needs to pre-fill on open).
     const { data: brand } = await supabase
       .from('brands')
-      .select('id, name, email, website_url, status, tryon_credits, tryon_credits_used, price_per_tryon_usd, unlimited, created_at')
+      .select('id, name, email, website_url, logo_url, primary_color, contact_name, contact_position, contact_phone, country, status, tryon_credits, tryon_credits_used, price_per_tryon_usd, unlimited, created_at')
       .eq('id', brandId)
       .single();
 
