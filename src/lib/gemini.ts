@@ -28,7 +28,7 @@ async function getAccessToken(scope: string): Promise<string> {
 // This ensures the API always gets a clean, consistent input regardless of what
 // the user uploaded (huge PNG, tiny JPEG, portrait, landscape, etc.)
 
-export async function preprocessImage(base64: string, mimeType: string, maxDim = 1024): Promise<{ base64: string; mimeType: string }> {
+export async function preprocessImage(base64: string, mimeType: string, maxDim = 512): Promise<{ base64: string; mimeType: string }> {
   const inputBuffer = Buffer.from(base64, 'base64');
 
   const outputBuffer = await sharp(inputBuffer)
@@ -200,7 +200,7 @@ export async function geminiTryOn(
   productMimeType: string,
   cachedGarment?: { data: string; mimeType: string },
   model = TRYON_MODEL_FALLBACK,
-  maxDim = 1024
+  maxDim = 512
 ): Promise<{ data: string; mimeType: string; model: string; isolatedGarment?: { data: string; mimeType: string } }> {
   // Preprocess user photo to target resolution before sending to Gemini
   const [userPhoto, productImg] = await Promise.all([
