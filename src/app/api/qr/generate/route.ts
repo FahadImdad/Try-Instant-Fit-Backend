@@ -126,12 +126,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'brand_id not found' }, { status: 404, headers: QR_CORS });
     }
 
-    // ── If image file uploaded, validate + push to GCS + pre-process garment ─
+    // ── Image + garment isolation ────────────────────────────────────────
+    // The QR is only useful once the garment has been isolated, so we
+    // require an isolated_garment_url before inserting the qr_codes row.
+    // Three paths can satisfy this requirement:
+    //   1) The linked product already has an isolated garment cached.
+    //   2) An image file is uploaded with this request — we isolate inline.
+    //   3) The product has an image_url but no isolated garment yet
+    //      (legacy / failed-on-create) — fetch + isolate from that URL.
+    // If all three paths fail, we return an error and do NOT create the
+    // QR. The brand can re-upload the image and try again.
     let finalDisplayUrl: string | null = resolvedDisplayUrl?.trim() || null;
     let isolatedGarmentUrl: string | null = resolvedIsolatedUrl;
     let garmentIsolated = !!resolvedIsolatedUrl;
-    let isolationError: string | null = null;
 
+    async function isolateBufferAndStore(buf: Buffer, mimeType: string): Promise<void> {
+      const cleanProductId = product_id!.trim();
+      const productBase64 = buf.toString('base64');
+      const isolated = await isolateGarment(productBase64, mimeType, ISOLATION_MODEL);
+      const isolatedBuf = Buffer.from(isolated.data, 'base64');
+      isolatedGarmentUrl = await uploadIsolatedGarment(isolatedBuf, cleanProductId, isolated.mimeType);
+
+      await supabase
+        .from('product_garments')
+        .upsert({
+          product_id: cleanProductId,
+          brand_id,
+          isolated_garment_url: isolatedGarmentUrl,
+          mime_type: isolated.mimeType,
+        }, { onConflict: 'product_id,brand_id' });
+
+      // Also write back to the products row when this QR is for a product_uuid.
+      if (product_uuid) {
+        await supabase
+          .from('products')
+          .update({ isolated_garment_url: isolatedGarmentUrl })
+          .eq('id', product_uuid);
+      }
+      garmentIsolated = true;
+    }
+
+    // Path 2: image file uploaded with this request.
     if (imageFile && imageFile.size > 0) {
       if (!ALLOWED_TYPES.includes(imageFile.type)) {
         return NextResponse.json(
@@ -148,32 +183,41 @@ export async function POST(request: NextRequest) {
       const buf = Buffer.from(await imageFile.arrayBuffer());
       const cleanProductId = product_id.trim();
 
-      // 1) Upload customer-facing display image
+      // Upload customer-facing display image
       finalDisplayUrl = await uploadProductImage(buf, brand_id, cleanProductId, imageFile.type);
 
-      // 2) Pre-process: isolate the garment ONCE upfront so every customer try-on is 1 AI call.
-      //    Best-effort — if it fails, the first customer scan will fall back to isolating then.
       try {
-        const productBase64 = buf.toString('base64');
-        const isolated = await isolateGarment(productBase64, imageFile.type, ISOLATION_MODEL);
-        const isolatedBuf = Buffer.from(isolated.data, 'base64');
-        isolatedGarmentUrl = await uploadIsolatedGarment(isolatedBuf, cleanProductId, isolated.mimeType);
-
-        // Cache in product_garments (keyed by product_id + brand_id)
-        await supabase
-          .from('product_garments')
-          .upsert({
-            product_id: cleanProductId,
-            brand_id,
-            isolated_garment_url: isolatedGarmentUrl,
-            mime_type: isolated.mimeType,
-          }, { onConflict: 'product_id,brand_id' });
-
-        garmentIsolated = true;
+        await isolateBufferAndStore(buf, imageFile.type);
       } catch (e) {
-        isolationError = e instanceof Error ? e.message : String(e);
-        console.error('[qr/generate] Garment isolation failed (will fall back on first scan):', isolationError);
+        console.error('[qr/generate] inline isolation failed:', e);
       }
+    }
+
+    // Path 3: existing product image — fetch and isolate now if we still
+    // don't have a garment URL.
+    if (!garmentIsolated && finalDisplayUrl) {
+      try {
+        const resp = await fetch(finalDisplayUrl);
+        if (resp.ok) {
+          const fetchedMime = (resp.headers.get('content-type') ?? 'image/jpeg').split(';')[0];
+          const fetchedBuf = Buffer.from(await resp.arrayBuffer());
+          await isolateBufferAndStore(fetchedBuf, fetchedMime);
+        } else {
+          console.warn('[qr/generate] could not fetch existing product image:', resp.status);
+        }
+      } catch (e) {
+        console.error('[qr/generate] fallback isolation from URL failed:', e);
+      }
+    }
+
+    if (!garmentIsolated) {
+      return NextResponse.json(
+        {
+          error: 'Could not process the product image. Please re-upload it from the product editor and try again.',
+          code: 'ISOLATION_FAILED',
+        },
+        { status: 422, headers: QR_CORS },
+      );
     }
 
     // Generate unique token (retry if collision — extremely unlikely with 60 bits)
@@ -205,14 +249,15 @@ export async function POST(request: NextRequest) {
     const scanBase = process.env.PUBLIC_SCAN_BASE_URL || 'https://tryinstantfit.com';
     const scanUrl = `${scanBase}/scan.html?token=${token}`;
 
+    // garment_isolated is always true here — the isolation gate above
+    // returns 422 before reaching this point if it isn't.
     return NextResponse.json(
       {
         qr,
         scan_url: scanUrl,
-        garment_isolated: garmentIsolated,
+        garment_isolated: true,
         isolated_garment_url: isolatedGarmentUrl,
         uploaded_image_url: finalDisplayUrl,
-        isolation_error: isolationError,
       },
       { status: 201, headers: QR_CORS },
     );
