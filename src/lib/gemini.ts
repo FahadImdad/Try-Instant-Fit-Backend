@@ -2,8 +2,8 @@ import { GoogleAuth } from 'google-auth-library';
 import sharp from 'sharp';
 
 // ── Model names ────────────────────────────────────────────────────────────────
-export const TRYON_MODEL_PRIMARY  = 'virtual-try-on-001';           // Vertex AI — GA, stable, $0.04/try-on
-export const TRYON_MODEL_FALLBACK = 'gemini-3.1-pro-image-preview';   // Gemini — best quality, ~$0.27/try-on
+export const TRYON_MODEL_PRIMARY  = 'virtual-try-on-001';            // Vertex AI — dormant after fallback removal
+export const TRYON_MODEL_FALLBACK = 'gemini-3.1-flash-image-preview'; // Gemini Flash 3.1 — default model, ~$0.045/img @ 512px
 
 const LOCATION = process.env.VERTEX_LOCATION ?? 'us-central1';
 const MAX_RETRIES = 3;
