@@ -23,6 +23,15 @@ function getStorage(): Storage {
   return _storage;
 }
 
+// Unique filename suffix avoids overwriting an existing object — overwrites in
+// fine-grained-ACL buckets need storage.objects.delete on the prior object's
+// ACLs, which the upload service account doesn't always have. Each upload
+// creates a fresh path, the new URL is stored in the DB row, old objects become
+// orphans (cheap to GC later).
+function uniqueSuffix() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export async function uploadIsolatedGarment(
   imageBuffer: Buffer,
   productId: string,
@@ -32,7 +41,8 @@ export async function uploadIsolatedGarment(
   if (!bucketName) throw new Error('GOOGLE_CLOUD_BUCKET_NAME is required');
 
   const ext = mimeType === 'image/png' ? 'png' : 'jpg';
-  const fileName = `garments/${productId}.${ext}`;
+  const safeProductId = productId.replace(/[^a-zA-Z0-9-_]/g, '-');
+  const fileName = `garments/${safeProductId}-${uniqueSuffix()}.${ext}`;
 
   const bucket = getStorage().bucket(bucketName);
   const file = bucket.file(fileName);
@@ -57,7 +67,7 @@ export async function uploadProductImage(
 
   const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
   const safeProductId = productId.replace(/[^a-zA-Z0-9-_]/g, '-');
-  const fileName = `products/${brandId}/${safeProductId}.${ext}`;
+  const fileName = `products/${brandId}/${safeProductId}-${uniqueSuffix()}.${ext}`;
 
   const bucket = getStorage().bucket(bucketName);
   const file = bucket.file(fileName);
@@ -68,8 +78,7 @@ export async function uploadProductImage(
     public: true,
   });
 
-  // Cache-bust by appending timestamp — same path overwrites but CDN may cache
-  return `https://storage.googleapis.com/${bucketName}/${fileName}?v=${Date.now()}`;
+  return `https://storage.googleapis.com/${bucketName}/${fileName}`;
 }
 
 export async function uploadBrandLogo(
