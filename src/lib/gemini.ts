@@ -227,7 +227,7 @@ export async function geminiTryOn(
   // Step 2: Apply isolated outfit to customer photo
   const result = await callGemini({
     systemInstruction: {
-      parts: [{ text: `You are a high-end fashion photo retoucher. You take a customer photo and an isolated-outfit reference, and you produce a photorealistic image of the customer wearing that outfit — indistinguishable from a real photograph. The result must look like a genuine photograph, NOT an AI-generated or rendered image. You preserve the customer's face, body, pose, and background exactly. The cloth must look like real fabric on a real person — with natural drape, weight, folds, wrinkles, seams, stitching, and texture, and lighting that matches the original photo.` }],
+      parts: [{ text: `You are a photo editing AI that performs full-outfit clothing swaps. You receive a customer photo and an isolated-outfit image (one or more garments together on white background, no person). Your job is to dress the customer in the COMPLETE outfit — every piece shown — preserving their face, body, pose, and background completely. You only change the clothing.` }],
     },
     contents: [
       {
@@ -235,29 +235,20 @@ export async function geminiTryOn(
         parts: [
           { text: `You will receive two images:
 
-IMAGE 1 — ISOLATED OUTFIT (reference only, on white background, no person):
-This is the COMPLETE outfit — every garment shown (e.g. top + bottom, kameez + shalwar + dupatta, jacket + pants, etc.) must appear on the customer. Use this for exact colors, fabrics, textures, collars, sleeves, lengths, buttons, embroidery, prints, and design details for every piece.
+IMAGE 1 — ISOLATED OUTFIT (one or more garments on white background, no person):
+This is the COMPLETE outfit — every garment shown (e.g. top + bottom, kameez + shalwar + dupatta, jacket + pants, etc.) must appear on the customer. Use this as your reference for exact colors, fabrics, textures, collars, sleeves, lengths, buttons, embroidery, prints, and all design details for every piece.
 
 IMAGE 2 — CUSTOMER PHOTO (your canvas):
-Preserve EVERYTHING exactly: face, skin tone, hair, pose, body proportions, hands, background, and the original photo's lighting direction, color temperature, and shadows.
+Preserve EVERYTHING exactly: face, pose, body, background.
 
-TASK: Replace ONLY the customer's existing clothing in IMAGE 2 with the COMPLETE outfit from IMAGE 1. Apply every garment piece in its natural position (top on torso, bottom on legs, dupatta draped over shoulders/across body, etc.). Do not skip or omit any piece.
+THE ONLY CHANGE: Replace the customer's existing clothing in IMAGE 2 with the COMPLETE outfit from IMAGE 1. Apply every garment piece in its natural position (top on torso, bottom on legs, dupatta draped over shoulders/across body, etc.). Do not skip or omit any piece.
 
-REALISM REQUIREMENTS — the output MUST look like a real photograph, not an AI render:
-1. FABRIC TEXTURE: render the visible weave / knit / embroidery / print at thread level — not flat or plastic-smooth. Match the fabric type from IMAGE 1 (cotton, silk, wool, denim, linen, brocade, velvet, etc.).
-2. NATURAL DRAPE & FOLDS: cloth must hang and fold the way real fabric does on a real body — natural creases at the elbows, waist, shoulders, hips, and where the body bends or sits. No stiff, floating, or symmetrically-perfect folds.
-3. LIGHTING & SHADOWS: light direction, intensity, and color temperature on the new outfit MUST match IMAGE 2's original lighting. Cast soft shadows under collars, cuffs, layered pieces, and where the cloth meets the body. Add subtle highlights on raised areas (shoulders, chest, sleeve tops) consistent with the photo's light source.
-4. EDGES & SEAMS: visible stitching at hems, seams, plackets, and cuffs. Natural soft transitions where cloth meets skin (collar/neck, cuffs/wrists, hem/legs) — no hard cut-out lines, no glow halos, no AI smoothing at the boundary.
-5. BODY CONFORMITY: cloth follows the body's actual shape and pose under the fabric — not a flat 2D paste-on. Sleeves wrap real arms; the torso piece follows the chest and waist; bottoms drape over the legs in the customer's exact pose.
-6. COLOR ACCURACY: keep the EXACT colors from IMAGE 1, but tinted slightly by IMAGE 2's lighting (a touch warmer / cooler / dimmer to match the room).
-7. NO ARTIFACTS: no plastic sheen, no over-smoothing, no extra fingers, no warped patterns, no duplicate buttons, no melted embroidery, no floating cloth, no double collars, no extra limbs.
-
-OUTPUT: a single photograph of the customer from IMAGE 2 wearing the full outfit from IMAGE 1, indistinguishable from a real fashion photo. Face, skin, hair, pose, body, hands, and background completely unchanged.` },
-          { text: 'IMAGE 1 — ISOLATED OUTFIT (reference, all pieces):' },
+OUTPUT: IMAGE 2 with the customer wearing the full outfit from IMAGE 1. Everything else (face, pose, body, background) unchanged.` },
+          { text: 'IMAGE 1 — ISOLATED OUTFIT (all pieces):' },
           { inlineData: { data: garment.data, mimeType: garment.mimeType } },
-          { text: 'IMAGE 2 — CUSTOMER PHOTO (canvas):' },
+          { text: 'IMAGE 2 — CUSTOMER PHOTO:' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
-          { text: 'Output a photorealistic photo of the customer from IMAGE 2 wearing the complete outfit from IMAGE 1 — every piece must appear on the customer. The cloth must look like REAL fabric: natural drape, folds, wrinkles, visible texture and stitching, and lighting that matches IMAGE 2. Face, pose, body, hands, hair, and background unchanged. The result must look like a real photograph, not an AI render.' },
+          { text: 'Now output IMAGE 2 with the customer dressed in the complete outfit from IMAGE 1 — every piece in IMAGE 1 must appear on the customer. Face, pose, body, and background unchanged.' },
         ],
       },
     ],
