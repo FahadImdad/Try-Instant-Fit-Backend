@@ -186,10 +186,16 @@ export async function POST(request: NextRequest) {
       // Upload customer-facing display image
       finalDisplayUrl = await uploadProductImage(buf, brand_id, cleanProductId, imageFile.type);
 
-      try {
-        await isolateBufferAndStore(buf, imageFile.type);
-      } catch (e) {
-        console.error('[qr/generate] inline isolation failed:', e);
+      // Only re-run AI isolation if the product doesn't already have an
+      // isolated garment cached. The products POST flow already pays for
+      // isolation once per product — re-running it here on every QR
+      // regeneration would double-charge the platform's Gemini bill.
+      if (!garmentIsolated) {
+        try {
+          await isolateBufferAndStore(buf, imageFile.type);
+        } catch (e) {
+          console.error('[qr/generate] inline isolation failed:', e);
+        }
       }
     }
 
