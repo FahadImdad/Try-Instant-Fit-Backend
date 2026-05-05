@@ -166,13 +166,15 @@ export async function isolateGarment(
           {
             text: `This is a product catalog photo showing a model or mannequin wearing one or more garments (an outfit).
 
-Your task: output an image of ONLY the garment item, completely isolated on a plain white background.
+Your task: output an image of the COMPLETE OUTFIT — every visible clothing item on the model — isolated together on a plain white background.
 - Remove the model/mannequin entirely — keep ONLY the clothing
 - Remove the background
-- Show the garment as if on an invisible hanger, at full size
-- CRITICAL — preserve the EXACT color: if the garment is sky blue, it must be sky blue in the output. If it is maroon, it must be maroon. Do not lighten, darken, or shift the color at all.
-- Preserve all details exactly: fabric texture, collar style, sleeve length, buttons, embroidery, cut, and any patterns
-Output: just the garment on a white background with its exact original color and details intact.`,
+- KEEP EVERY garment piece visible in the photo: top, kameez, shirt, kurta, bottom, trousers, shalwar, pants, skirt, dupatta, scarf, jacket, vest, belt — all of them, arranged together in their natural relative positions (top above bottom, dupatta draped or alongside, etc.)
+- Do NOT drop, hide, or omit any clothing piece. If the model is wearing a 3-piece suit (kameez + shalwar + dupatta), output all three. If it's a 2-piece (top + bottom), output both.
+- Show the outfit flat or as if on an invisible hanger/dress form, at full size, with each piece clearly visible
+- CRITICAL — preserve the EXACT colors of every piece: if the kameez is sky blue and the dupatta is maroon, both must keep those exact colors in the output. Do not lighten, darken, or shift any color.
+- Preserve all details exactly: fabric texture, collar style, sleeve length, buttons, embroidery, prints, patterns, cut, and length — for every piece
+Output: the complete outfit (all clothing pieces together) on a white background, with every piece's exact original color and details intact.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
