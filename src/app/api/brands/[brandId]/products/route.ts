@@ -146,7 +146,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .select('*')
       .single();
 
-    // Charge 1 credit for image processing (only if isolation succeeded)
+    if (error) {
+      const pgErr = error as { code?: string; message?: string; details?: string; hint?: string };
+      console.error('[products POST] insert failed:', pgErr);
+      if (pgErr.code === '23505') {
+        return NextResponse.json({ error: 'A product with this SKU already exists' }, { status: 409, headers: CORS });
+      }
+      const detail = pgErr.message || pgErr.details || pgErr.hint || 'database insert failed';
+      return NextResponse.json(
+        { error: `Failed to create product: ${detail}`, code: pgErr.code },
+        { status: 500, headers: CORS },
+      );
+    }
+
+    // Charge 1 credit for image processing (only if isolation succeeded AND insert succeeded)
     if (isolatedUrl && !brand.unlimited) {
       await supabase
         .from('brands')
@@ -170,17 +183,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       });
     }
 
-    if (error) {
-      if ((error as { code?: string }).code === '23505') {
-        return NextResponse.json({ error: 'A product with this SKU already exists' }, { status: 409, headers: CORS });
-      }
-      throw error;
-    }
-
     return NextResponse.json({ product }, { status: 201, headers: CORS });
   } catch (e) {
     console.error('[products POST]', e);
-    const msg = e instanceof Error ? e.message : 'Failed to create product';
+    // Extract message from Error instances AND from supabase PostgrestError-shaped objects
+    let msg = 'Failed to create product';
+    if (e instanceof Error) {
+      msg = e.message;
+    } else if (e && typeof e === 'object') {
+      const obj = e as { message?: string; details?: string; hint?: string };
+      msg = obj.message || obj.details || obj.hint || msg;
+    }
     return NextResponse.json({ error: msg }, { status: 500, headers: CORS });
   }
 }
