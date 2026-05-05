@@ -42,15 +42,26 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
 /**
  * PATCH /api/passcodes/[passcodeId]
- * Update active state, use_limit, expires_at, customer_label.
+ * Update code, active state, use_limit, expires_at, customer_label.
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { passcodeId } = await params;
     const body = await request.json();
-    const allowed = ['active', 'use_limit', 'expires_at', 'customer_label'];
+    const allowed = ['code', 'active', 'use_limit', 'expires_at', 'customer_label'];
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const k of allowed) if (k in body) update[k] = body[k];
+
+    if ('code' in update) {
+      const raw = String(update.code ?? '').trim().toUpperCase();
+      if (!/^[A-Z0-9_-]{3,32}$/.test(raw)) {
+        return NextResponse.json(
+          { error: 'Code must be 3–32 characters: letters, digits, underscore, or hyphen' },
+          { status: 400, headers: CORS },
+        );
+      }
+      update.code = raw;
+    }
 
     const { data, error } = await supabase
       .from('brand_passcodes')
@@ -58,11 +69,23 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       .eq('id', passcodeId)
       .select('*')
       .single();
-    if (error) throw error;
+    if (error) {
+      const pgErr = error as { code?: string; message?: string };
+      if (pgErr.code === '23505') {
+        return NextResponse.json(
+          { error: 'A passcode with this code already exists for this brand' },
+          { status: 409, headers: CORS },
+        );
+      }
+      throw error;
+    }
     return NextResponse.json({ passcode: data }, { status: 200, headers: CORS });
   } catch (e) {
     console.error('[passcodes/[id] PATCH]', e);
-    return NextResponse.json({ error: 'Failed to update passcode' }, { status: 500, headers: CORS });
+    const msg = e instanceof Error ? e.message
+      : (e && typeof e === 'object' && 'message' in e) ? String((e as { message: unknown }).message)
+      : 'Failed to update passcode';
+    return NextResponse.json({ error: msg }, { status: 500, headers: CORS });
   }
 }
 

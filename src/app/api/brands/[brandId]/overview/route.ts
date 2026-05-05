@@ -60,7 +60,11 @@ export async function GET(
       .eq('brand_id', brandId)
       .order('created_at', { ascending: false });
 
-    const tryons = allTryons ?? [];
+    // Drop internal "[Setup] ..." rows that get logged when a product is added
+    // (they're audit entries for the AI isolation cost, not real customer
+    // try-ons — the dashboard's TOTAL TRY-ONS / TODAY counters should reflect
+    // customer activity, not setup work).
+    const tryons = (allTryons ?? []).filter(r => !(r.product_name ?? '').startsWith('[Setup]'));
 
     // ── Compute overall + per-source stats from in-memory rows ───────────────
     function emptyStats(): SourceStats {
@@ -156,16 +160,18 @@ export async function GET(
     }
     const allProducts = Array.from(productMap.values()).sort((a, b) => b.tryon_count - a.tryon_count);
 
-    // ── Scan & Wear specific (QRs + passcodes + scan events) ─────────────────
+    // ── Scan & Wear specific (QRs + brand-wide passcodes + scan events) ─────
+    // Passcodes were migrated from per-QR (qr_passcodes) → brand-wide
+    // (brand_passcodes); the dashboard's "Passcodes" count was reading from
+    // the empty legacy table and always showing 0.
+    const qrIdsResult = await supabase.from('qr_codes').select('id').eq('brand_id', brandId);
+    const qrIds = qrIdsResult.data?.map(q => q.id) ?? [];
+    const qrIdsForIn = qrIds.length ? qrIds : ['00000000-0000-0000-0000-000000000000'];
     const [{ count: qrTotal }, { count: qrActive }, { count: passcodeTotal }, { count: scansTotal }] = await Promise.all([
       supabase.from('qr_codes').select('*', { count: 'exact', head: true }).eq('brand_id', brandId),
       supabase.from('qr_codes').select('*', { count: 'exact', head: true }).eq('brand_id', brandId).eq('active', true),
-      supabase.from('qr_passcodes').select('qr_id', { count: 'exact', head: true }).in('qr_id',
-        (await supabase.from('qr_codes').select('id').eq('brand_id', brandId)).data?.map(q => q.id) ?? ['00000000-0000-0000-0000-000000000000']
-      ),
-      supabase.from('qr_scans').select('id', { count: 'exact', head: true }).in('qr_id',
-        (await supabase.from('qr_codes').select('id').eq('brand_id', brandId)).data?.map(q => q.id) ?? ['00000000-0000-0000-0000-000000000000']
-      ),
+      supabase.from('brand_passcodes').select('id', { count: 'exact', head: true }).eq('brand_id', brandId).eq('active', true),
+      supabase.from('qr_scans').select('id', { count: 'exact', head: true }).in('qr_id', qrIdsForIn),
     ]);
 
     const recent = tryons.slice(0, 20).map(r => ({
