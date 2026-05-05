@@ -70,7 +70,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
         isolated_garment_url: p?.isolated_garment_url || isolatedBySku[q.product_id] || null,
         // Brand-wide passcode count (same number on every card)
         brand_active_passcodes: activePasscodes ?? 0,
-        scan_url: `${scanBase}/scan.html?token=${q.token}`,
+        scan_url: `${scanBase}/scan/${q.token}`,
       };
     });
 

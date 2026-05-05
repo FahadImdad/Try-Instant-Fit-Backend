@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
     if (qrError) throw qrError;
 
     const scanBase = process.env.PUBLIC_SCAN_BASE_URL || 'https://tryinstantfit.com';
-    const scanUrl = `${scanBase}/scan.html?token=${token}`;
+    const scanUrl = `${scanBase}/scan/${token}`;
 
     // garment_isolated is always true here — the isolation gate above
     // returns 422 before reaching this point if it isn't.
