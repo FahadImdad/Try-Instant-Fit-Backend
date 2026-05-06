@@ -57,6 +57,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (typeof body.active === 'boolean') update.active = body.active;
+    if (typeof body.requires_passcode === 'boolean') update.requires_passcode = body.requires_passcode;
     if (body.total_limit === null || typeof body.total_limit === 'number') update.total_limit = body.total_limit;
     if (body.expires_at === null || typeof body.expires_at === 'string') update.expires_at = body.expires_at;
 

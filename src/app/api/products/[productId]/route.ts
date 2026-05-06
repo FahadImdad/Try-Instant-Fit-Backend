@@ -40,7 +40,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { productId } = await params;
     const body = await request.json();
-    const allowed = ['name', 'price', 'currency', 'description', 'active'];
+    const allowed = ['name', 'sku', 'price', 'currency', 'description', 'active'];
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const k of allowed) if (k in body) update[k] = body[k];
 
