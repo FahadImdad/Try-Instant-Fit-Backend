@@ -60,11 +60,18 @@ export async function GET(
       .eq('brand_id', brandId)
       .order('created_at', { ascending: false });
 
-    // Drop internal "[Setup] ..." rows that get logged when a product is added
-    // (they're audit entries for the AI isolation cost, not real customer
-    // try-ons — the dashboard's TOTAL TRY-ONS / TODAY counters should reflect
-    // customer activity, not setup work).
-    const tryons = (allTryons ?? []).filter(r => !(r.product_name ?? '').startsWith('[Setup]'));
+    // "[Setup] ..." rows are logged when a product is added (one credit per
+    // product for AI isolation). They're not customer try-ons, so we don't
+    // count them in TOTAL TRY-ONS / TODAY etc — but we DO surface them
+    // separately as "QR processing" credits so the brand can see exactly
+    // where their credit balance went.
+    const setupRows = (allTryons ?? []).filter(r => (r.product_name ?? '').startsWith('[Setup]'));
+    const tryons    = (allTryons ?? []).filter(r => !(r.product_name ?? '').startsWith('[Setup]'));
+
+    const setupCreditsUsed = setupRows.length;
+    const setupCostUsdTotal = Math.round(
+      setupRows.reduce((s, r) => s + Number(r.cost_usd ?? 0), 0) * 10000,
+    ) / 10000;
 
     // ── Compute overall + per-source stats from in-memory rows ───────────────
     function emptyStats(): SourceStats {
@@ -196,6 +203,12 @@ export async function GET(
         avg_processing_ms: overall.avg_processing_ms,
         button_clicks: buttonClicks ?? 0,
         cost_usd_total: overall.cost_usd_total,
+        // Breakdown of where credits went, so the dashboard can show
+        // "X spent on customer try-ons" vs "Y spent on QR/product processing"
+        setup_credits_used: setupCreditsUsed,
+        setup_cost_usd_total: setupCostUsdTotal,
+        tryon_credits_used: overall.total,
+        tryon_cost_usd_total: overall.cost_usd_total,
       },
       by_source: {
         'ghost-layer': {
