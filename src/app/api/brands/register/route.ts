@@ -77,9 +77,6 @@ export async function POST(request: NextRequest) {
     if (!contact_phone?.trim()) {
       return NextResponse.json({ error: 'WhatsApp number is required' }, { status: 400, headers: CORS });
     }
-    if (!website_url?.trim()) {
-      return NextResponse.json({ error: 'Website URL is required' }, { status: 400, headers: CORS });
-    }
     if (!country?.trim()) {
       return NextResponse.json({ error: 'Country is required' }, { status: 400, headers: CORS });
     }
@@ -96,13 +93,15 @@ export async function POST(request: NextRequest) {
     if (phoneDigits.length < 7 || phoneDigits.length > 15) {
       return NextResponse.json({ error: 'Phone number must be 7–15 digits' }, { status: 400, headers: CORS });
     }
-    try {
-      const parsed = new URL(website_url.trim());
-      if (!['http:', 'https:'].includes(parsed.protocol)) {
-        return NextResponse.json({ error: 'Website URL must start with http:// or https://' }, { status: 400, headers: CORS });
+    if (website_url?.trim()) {
+      try {
+        const parsed = new URL(website_url.trim());
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          return NextResponse.json({ error: 'Website URL must start with http:// or https://' }, { status: 400, headers: CORS });
+        }
+      } catch {
+        return NextResponse.json({ error: 'Website URL is not valid' }, { status: 400, headers: CORS });
       }
-    } catch {
-      return NextResponse.json({ error: 'Website URL is not valid' }, { status: 400, headers: CORS });
     }
     if (primary_color && !/^#[0-9a-fA-F]{6}$/.test(primary_color)) {
       return NextResponse.json({ error: 'Brand color must be a 6-digit hex (e.g. #5a67f2)' }, { status: 400, headers: CORS });
