@@ -80,9 +80,6 @@ export async function POST(request: NextRequest) {
     if (!country?.trim()) {
       return NextResponse.json({ error: 'Country is required' }, { status: 400, headers: CORS });
     }
-    if (!logoFile || logoFile.size === 0) {
-      return NextResponse.json({ error: 'Brand logo is required' }, { status: 400, headers: CORS });
-    }
 
     // ── Validation ─────────────────────────────────────────────────────────
     const phone = contact_phone.trim();
@@ -106,11 +103,13 @@ export async function POST(request: NextRequest) {
     if (primary_color && !/^#[0-9a-fA-F]{6}$/.test(primary_color)) {
       return NextResponse.json({ error: 'Brand color must be a 6-digit hex (e.g. #5a67f2)' }, { status: 400, headers: CORS });
     }
-    if (!ALLOWED_LOGO_TYPES.includes(logoFile.type)) {
-      return NextResponse.json({ error: 'Logo must be JPEG, PNG, WebP, or SVG' }, { status: 400, headers: CORS });
-    }
-    if (logoFile.size > MAX_LOGO_SIZE) {
-      return NextResponse.json({ error: 'Logo must be 5MB or smaller' }, { status: 400, headers: CORS });
+    if (logoFile && logoFile.size > 0) {
+      if (!ALLOWED_LOGO_TYPES.includes(logoFile.type)) {
+        return NextResponse.json({ error: 'Logo must be JPEG, PNG, WebP, or SVG' }, { status: 400, headers: CORS });
+      }
+      if (logoFile.size > MAX_LOGO_SIZE) {
+        return NextResponse.json({ error: 'Logo must be 5MB or smaller' }, { status: 400, headers: CORS });
+      }
     }
 
     // Resolve email: prefer Google-verified token, fall back to plain field
@@ -174,14 +173,15 @@ export async function POST(request: NextRequest) {
       .single();
     if (brandError) throw brandError;
 
-    // Upload logo (validated above — best-effort against storage errors)
-    let logoUrl: string | null = null;
-    try {
-      const buf = Buffer.from(await logoFile.arrayBuffer());
-      logoUrl = await uploadBrandLogo(buf, brand.id, logoFile.type);
-      await supabase.from('brands').update({ logo_url: logoUrl }).eq('id', brand.id);
-    } catch (e) {
-      console.error('[register] Logo upload failed:', e);
+    // Upload logo if provided (validated above — best-effort against storage errors)
+    if (logoFile && logoFile.size > 0) {
+      try {
+        const buf = Buffer.from(await logoFile.arrayBuffer());
+        const logoUrl = await uploadBrandLogo(buf, brand.id, logoFile.type);
+        await supabase.from('brands').update({ logo_url: logoUrl }).eq('id', brand.id);
+      } catch (e) {
+        console.error('[register] Logo upload failed:', e);
+      }
     }
 
     // Default widget config
