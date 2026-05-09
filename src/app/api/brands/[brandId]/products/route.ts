@@ -81,10 +81,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Verify brand + check quota (image processing costs 1 try-on credit)
     const { data: brand } = await supabase
       .from('brands')
-      .select('id, tryon_credits, tryon_credits_used, unlimited')
+      .select('id, status, price_per_tryon_usd, tryon_credits, tryon_credits_used, unlimited')
       .eq('id', brandId)
       .maybeSingle();
     if (!brand) return NextResponse.json({ error: 'Brand not found' }, { status: 404, headers: CORS });
+
+    // Gate: brands must be admin-approved (status='active') or on the
+    // 'unlimited' plan before they can consume credits. Pending / suspended
+    // brands can still log in and view their dashboard, but actions that
+    // would deduct credits are blocked here.
+    if (!brand.unlimited && brand.status !== 'active') {
+      return NextResponse.json(
+        { error: 'Your account is pending admin approval. Image processing will resume once your brand is approved.', code: 'NOT_APPROVED' },
+        { status: 403, headers: CORS },
+      );
+    }
 
     // If we'll process an image, the brand needs at least 1 credit
     const willProcessImage = imageFile && imageFile.size > 0;
@@ -180,6 +191,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         cost_usd: 0.045,
         source: 'ghost-layer',
         product_uuid: product?.id ?? null,
+      });
+
+      // Write credit_ledger row for deep analytics (uniform $0.125/credit)
+      await supabase.from('credit_ledger').insert({
+        brand_id: brandId,
+        product_id: sku.trim(),
+        kind: 'process',
+        amount: 1,
+        cost_usd: Number(brand.price_per_tryon_usd) || 0.125,
+        notes: `Image processing for ${name.trim()}`,
       });
     }
 

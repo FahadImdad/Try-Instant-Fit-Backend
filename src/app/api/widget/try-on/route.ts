@@ -44,15 +44,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Photo must be under 10MB' }, { status: 400 });
     }
 
-    // ── Quota pre-check: brand must have credits or be unlimited ────────────
+    // ── Quota pre-check: brand must be admin-approved + have credits ───────
     const { data: brandQuota } = await supabase
       .from('brands')
-      .select('tryon_credits, tryon_credits_used, unlimited')
+      .select('status, price_per_tryon_usd, tryon_credits, tryon_credits_used, unlimited')
       .eq('id', brandId)
       .maybeSingle();
 
     if (!brandQuota) {
       return NextResponse.json({ error: 'Brand not found' }, { status: 404 });
+    }
+
+    // Gate: admin must approve the brand (status='active') before customer
+    // try-ons consume credits. Pending / suspended brands get a clear
+    // message instead of a silent failure.
+    if (!brandQuota.unlimited && brandQuota.status !== 'active') {
+      return NextResponse.json({
+        error: 'This brand is pending approval. Try-ons will resume once approved.',
+        code: 'BRAND_NOT_APPROVED',
+      }, { status: 403 });
     }
 
     const remaining = brandQuota.unlimited
@@ -192,6 +202,19 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq('id', brandId);
+
+      // Write a credit_ledger row for deep analytics — uniform $0.125/credit
+      // (or whatever the brand's price_per_tryon_usd is set to).
+      await supabase.from('credit_ledger').insert({
+        brand_id:   brandId,
+        product_id: productId,
+        qr_id:      qrId,
+        tryon_id:   tryonId,
+        kind:       'tryon',
+        amount:     1,
+        cost_usd:   Number(brandQuota.price_per_tryon_usd) || 0.125,
+        notes:      `Try-on (${source})`,
+      });
     }
 
     // ── Scan & Wear: bump counters + log scan + link tryon to passcode ─────
