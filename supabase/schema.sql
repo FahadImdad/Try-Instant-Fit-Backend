@@ -177,6 +177,69 @@ CREATE INDEX IF NOT EXISTS idx_contact_submissions_status ON contact_submissions
 CREATE INDEX IF NOT EXISTS idx_contact_submissions_created_at ON contact_submissions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_product_garments_brand_id ON product_garments(brand_id);
 
+-- ── Try-On Reports / Feedback ─────────────────────────────────────────────────
+-- Captures customer + brand reports of bad try-ons, bad image-processing, or
+-- general feedback. An approved 'tryon_bad' report refunds 1 credit to the
+-- brand (handled by the admin endpoint, not a trigger, so the audit trail is
+-- explicit).
+CREATE TABLE IF NOT EXISTS tryon_reports (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id        UUID REFERENCES brands(id) ON DELETE SET NULL,
+  tryon_id        UUID REFERENCES tryons(id) ON DELETE SET NULL,
+  product_id      UUID REFERENCES products(id) ON DELETE SET NULL,
+  qr_id           UUID REFERENCES qr_codes(id) ON DELETE SET NULL,
+  -- 'tryon_bad'      → bad virtual try-on result (eligible for refund)
+  -- 'image_bad'      → garment-isolation / image-processing produced a bad asset
+  -- 'feedback'       → general feedback (👍 / 👎 / free text), no refund
+  -- 'difficulty'     → user reports a platform difficulty (any page)
+  type            TEXT NOT NULL CHECK (type IN ('tryon_bad','image_bad','feedback','difficulty')),
+  rating          SMALLINT CHECK (rating BETWEEN -1 AND 5),  -- -1=👎, 0=neutral, 1=👍, or 1–5 stars
+  reason          TEXT,                                       -- short reason code or label
+  message         TEXT,                                       -- free-text user note
+  screenshot_url  TEXT,                                       -- optional uploaded screenshot
+  result_url      TEXT,                                       -- the try-on image being reported (if any)
+  source          TEXT NOT NULL DEFAULT 'customer'
+                    CHECK (source IN ('customer','brand','admin')),
+  -- Admin review state
+  status          TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending','approved','denied','closed')),
+  resolved_by     TEXT,
+  resolved_at     TIMESTAMPTZ,
+  resolution_note TEXT,
+  -- Refund tracking (set when an approved 'tryon_bad' report refunds a credit)
+  credit_refunded BOOLEAN NOT NULL DEFAULT FALSE,
+  refund_at       TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_tryon_reports_brand_id    ON tryon_reports(brand_id);
+CREATE INDEX IF NOT EXISTS idx_tryon_reports_status      ON tryon_reports(status);
+CREATE INDEX IF NOT EXISTS idx_tryon_reports_created_at  ON tryon_reports(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tryon_reports_type        ON tryon_reports(type);
+
+-- ── Credit Ledger (deep analytics: try-on + image-processing splits) ─────────
+-- One row per credit-consuming event so we can show real-time per-product /
+-- per-day breakdowns on both the brand dashboard and the admin panel,
+-- separate from the existing aggregate counters on the brands table.
+CREATE TABLE IF NOT EXISTS credit_ledger (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id        UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  product_id      UUID REFERENCES products(id) ON DELETE SET NULL,
+  qr_id           UUID REFERENCES qr_codes(id) ON DELETE SET NULL,
+  tryon_id        UUID REFERENCES tryons(id) ON DELETE SET NULL,
+  -- 'tryon'      → 1 credit deducted for a virtual try-on
+  -- 'process'    → cost of garment isolation / image preprocessing
+  -- 'refund'     → 1 credit credited back (e.g. approved 'tryon_bad' report)
+  -- 'topup'      → admin/manual top-up (mirrors brand_credit_topups for unification)
+  kind            TEXT NOT NULL CHECK (kind IN ('tryon','process','refund','topup')),
+  amount          INTEGER NOT NULL,                 -- positive = consumed, negative = refunded back
+  cost_usd        NUMERIC(10,4),                    -- estimated $ cost (optional, for admin analytics)
+  notes           TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_credit_ledger_brand_id    ON credit_ledger(brand_id);
+CREATE INDEX IF NOT EXISTS idx_credit_ledger_kind        ON credit_ledger(kind);
+CREATE INDEX IF NOT EXISTS idx_credit_ledger_created_at  ON credit_ledger(created_at DESC);
+
 -- ── Demo Brand (for testing) ──────────────────────────────────────────────────
 INSERT INTO brands (id, name, email, website_url, status, unlimited)
 VALUES (
