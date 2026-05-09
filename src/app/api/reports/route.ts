@@ -83,9 +83,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!message?.trim() && !reason?.trim() && rating === undefined && !screenshot_url) {
+    // Refund-eligible reports must include image proof (the result image
+    // and/or a user screenshot). Without proof we won't process them, so
+    // the admin queue stays free of un-actionable reports.
+    const isRefundEligible = type === 'tryon_bad' || type === 'image_bad';
+    if (isRefundEligible && !result_url?.trim() && !screenshot_url?.trim()) {
       return NextResponse.json(
-        { error: 'Provide at least one of: message, reason, rating, screenshot_url' },
+        { error: 'A picture or screenshot is required to report a bad try-on or bad image processing. Reports without proof cannot be processed for a refund.' },
+        { status: 400, headers: CORS },
+      );
+    }
+
+    if (!message?.trim() && !reason?.trim() && rating === undefined && !screenshot_url && !result_url) {
+      return NextResponse.json(
+        { error: 'Provide at least one of: message, reason, rating, screenshot_url, result_url' },
         { status: 400, headers: CORS },
       );
     }

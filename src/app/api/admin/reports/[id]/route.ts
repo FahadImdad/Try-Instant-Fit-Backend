@@ -45,6 +45,29 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // ── APPROVE: route through the atomic refund function ──
     if (action === 'approve') {
+      // Defense-in-depth: never approve a refund without image proof, even
+      // if a malformed POST somehow created the row. The customer-facing
+      // /api/reports endpoint already enforces this on submit.
+      const { data: existing, error: readErr } = await supabase
+        .from('tryon_reports')
+        .select('result_url, screenshot_url, type, status')
+        .eq('id', id)
+        .single();
+      if (readErr || !existing) {
+        return NextResponse.json({ error: 'Report not found' }, { status: 404, headers: ADMIN_CORS });
+      }
+      if (existing.status !== 'pending') {
+        return NextResponse.json({ error: `Report already resolved (status=${existing.status})` }, { status: 400, headers: ADMIN_CORS });
+      }
+      const isRefundEligible = existing.type === 'tryon_bad' || existing.type === 'image_bad';
+      const hasProof = !!(existing.result_url?.trim() || existing.screenshot_url?.trim());
+      if (isRefundEligible && !hasProof) {
+        return NextResponse.json(
+          { error: 'Cannot approve refund — this report has no picture/screenshot attached as proof.' },
+          { status: 400, headers: ADMIN_CORS },
+        );
+      }
+
       const { data: refundData, error: refundError } = await supabase.rpc('refund_credit_for_report', {
         p_report_id:    id,
         p_resolved_by:  resolvedBy,
