@@ -11,31 +11,39 @@ export async function GET(request: NextRequest) {
   if (unauthorized) return unauthorized;
 
   try {
-    const [{ data: brands, error: brandsError }, { data: summary, error: summaryError }] = await Promise.all([
+    // Counts derived from `tryons` table (same source the brand-facing API uses)
+    // rather than `credit_ledger`, which only started getting writes recently and
+    // is missing all historical events. Each tryons row is one credit-consuming
+    // event:
+    //   • product_name LIKE '[Setup]%'  → product-image upload (kind='process')
+    //   • otherwise                     → customer try-on       (kind='tryon')
+    const [{ data: brands, error: brandsError }, { data: tryonRows, error: tryonsError }] = await Promise.all([
       supabase
         .from('brands')
         .select('id, name, email, website_url, status, tryon_credits, tryon_credits_used, price_per_tryon_usd, unlimited, created_at')
         .order('created_at', { ascending: false }),
       supabase
-        .from('brand_credit_summary')
-        .select('brand_id, tryon_count, process_count, refund_count'),
+        .from('tryons')
+        .select('brand_id, product_name'),
     ]);
 
     if (brandsError) throw brandsError;
-    if (summaryError) throw summaryError;
+    if (tryonsError) throw tryonsError;
 
-    // Merge per-brand try-on vs product-upload breakdown into the brand objects.
-    // tryon_count = customer try-ons; process_count = product-image uploads processed.
-    const summaryByBrand = new Map(
-      (summary ?? []).map((s: { brand_id: string; tryon_count: number; process_count: number; refund_count: number }) => [s.brand_id, s])
-    );
+    const countsByBrand = new Map<string, { tryon_count: number; process_count: number }>();
+    for (const r of (tryonRows ?? []) as { brand_id: string; product_name: string | null }[]) {
+      const c = countsByBrand.get(r.brand_id) ?? { tryon_count: 0, process_count: 0 };
+      if ((r.product_name ?? '').startsWith('[Setup]')) c.process_count++;
+      else c.tryon_count++;
+      countsByBrand.set(r.brand_id, c);
+    }
+
     const enriched = (brands ?? []).map((b) => {
-      const s = summaryByBrand.get(b.id);
+      const c = countsByBrand.get(b.id);
       return {
         ...b,
-        tryon_count: s?.tryon_count ?? 0,
-        process_count: s?.process_count ?? 0,
-        refund_count: s?.refund_count ?? 0,
+        tryon_count: c?.tryon_count ?? 0,
+        process_count: c?.process_count ?? 0,
       };
     });
 
