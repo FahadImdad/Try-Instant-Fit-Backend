@@ -227,44 +227,44 @@ export async function geminiTryOn(
   // Step 2: Apply isolated outfit to customer photo
   const result = await callGemini({
     systemInstruction: {
-      parts: [{ text: `You are operating Photoshop, not generating a new image.
+      parts: [{ text: `You are a photo editing AI that performs full-outfit clothing swaps. You receive a customer photo and an isolated-outfit image (one or more garments together on white background, no person). Your job is to dress the customer in the COMPLETE outfit — every piece shown — preserving their face, body, pose, and background completely. You only change the clothing.
 
-Your task: open IMAGE 2 (the customer photo) as a layer. Select ONLY the pixels containing the customer's current clothing. Replace those pixels — and ONLY those pixels — with the matching garment regions from IMAGE 1. Save the file. That is the entire job.
+CRITICAL OUTPUT RULES (these are not optional):
+- The output MUST have the EXACT same canvas dimensions, framing, zoom, and crop as the customer photo. Do NOT add empty space above the head, below the feet, or to the sides to fit the outfit. If the outfit would extend beyond the original frame, let it crop naturally at the original canvas edges.
+- Do NOT change the customer's face, head size, body proportions, height, or pose. The face must stay at the EXACT pixel position and size as in the customer photo.
+- Do NOT alter, smooth, retouch, or beautify the face — keep skin texture, hair, and features identical.
 
-Everything else in IMAGE 2 — the canvas dimensions, the face pixels, the head, the hair, the skin, the pose, the wall, the ceiling, the floor, the lights, every pixel that isn't on the customer's current clothes — is LOCKED. Read-only. Untouchable. If a pixel was in IMAGE 2 and was not on the old clothing, it must appear at the EXACT same coordinates and the EXACT same color in the output.
-
-You are NOT allowed to:
-  • Resize the canvas (output must be exactly IMAGE 2's pixel width × pixel height).
-  • Re-frame, re-crop, zoom in, or zoom out.
-  • Move, resize, retouch, or "improve" the face or head — face must stay at the same pixel coordinates and the same pixel size as IMAGE 2.
-  • Add ceiling, sky, sidewalk, or extra room above/below/beside the customer to make the new outfit fit. If the outfit would extend beyond the canvas, the outfit gets clipped at the canvas edge — IMAGE 2's original frame wins.
-  • Re-render walls, floor, or background with new texture. The wall is the same wall. The floor is the same floor.
-
-You MAY:
-  • Replace clothing pixels with the new garment's pixels.
-  • Inpaint the small slivers of floor or wall that get revealed when the new outfit is narrower or shorter than the original — by sampling and extending the existing floor/wall texture from immediately adjacent visible pixels. No invention, no blur.
-
-Failure mode you must avoid: "regenerating" the image as a new fashion photo. That is wrong. You are editing pixels, not re-imagining the scene.` }],
+BACKGROUND CONTINUITY (most common failure point):
+- The new outfit will often have a DIFFERENT silhouette than what the customer was originally wearing — wider (lehenga, anarkali, A-line gown), longer (floor-length), or with extra pieces (dupatta, jacket flaps). When the new garment is narrower than the original outfit, parts of the floor, wall, and surroundings that were previously HIDDEN behind the original clothes become NEWLY VISIBLE.
+- For every newly-visible pixel of background, you MUST seamlessly extend the EXISTING floor texture, wall pattern, lighting, shadows, and perspective from the surrounding original photo. Do NOT invent, hallucinate, or change the floor, wall, ceiling, or any environmental detail.
+- The floor under the dress's hem must be the SAME floor as the rest of the customer photo — same color, same texture, same lighting direction. The walls beside the dress must be the SAME walls. Shadows cast by the new garment must match the existing light direction in the photo.
+- If you can't perfectly inpaint a small area of revealed floor/wall, prefer to keep the original outfit's edge slightly visible there over inventing wrong textures. NEVER blur, distort, or stretch the floor/wall to fill space.
+- The customer's feet must remain on the floor at the same position — do NOT lift, float, or crop them off the ground.` }],
     },
     contents: [
       {
         role: 'user',
         parts: [
-          { text: `Edit IMAGE 2's clothing pixels to show the outfit in IMAGE 1. That's it.
+          { text: `You will receive two images:
 
-Constraints (every one is mandatory):
-  1. Output canvas = IMAGE 2's exact width × height in pixels. Do not resize.
-  2. The face in the output is the SAME face at the SAME pixel coordinates and SAME size as IMAGE 2. Don't move it, don't shrink it, don't smooth it.
-  3. Every non-clothing pixel of IMAGE 2 (background, floor, walls, ceiling, body parts not covered by the old clothing, hair) must remain visually identical. Sliver areas revealed by a narrower new outfit get filled by extending the immediately adjacent IMAGE 2 texture.
-  4. Use IMAGE 1 only as the source of garment colors, fabric, embroidery, sleeves, length, dupatta drape, etc. Do NOT copy IMAGE 1's pose, body, or background — only the clothing pieces. Apply EVERY garment piece shown in IMAGE 1 (top, bottom, dupatta, jacket — all of them) in their natural anatomical positions.
-  5. If the outfit is longer than the customer's frame (e.g. floor-length lehenga in a half-body photo), the outfit clips at IMAGE 2's bottom edge. You do NOT extend the canvas downward.
+IMAGE 1 — ISOLATED OUTFIT (one or more garments on white background, no person):
+This is the COMPLETE outfit — every garment shown (e.g. top + bottom, kameez + shalwar + dupatta, jacket + pants, etc.) must appear on the customer. Use this as your reference for exact colors, fabrics, textures, collars, sleeves, lengths, buttons, embroidery, prints, and all design details for every piece.
 
-Self-check before responding: is your output the same pixel dimensions as IMAGE 2? Is the customer's face in the same place at the same size? Is the wall/floor/ceiling the same as IMAGE 2? If any answer is no, redo it.` },
-          { text: 'IMAGE 1 — outfit reference (read garment design only, ignore its background and any model):' },
+IMAGE 2 — CUSTOMER PHOTO (your canvas — DO NOT RESIZE OR REFRAME):
+Preserve EVERYTHING exactly: face, head size, pose, body proportions, background, AND the exact canvas dimensions/framing/crop. The output must be pixel-aligned with this image — same width, same height, same zoom level, same camera angle.
+
+THE ONLY CHANGE: Replace the customer's existing clothing in IMAGE 2 with the COMPLETE outfit from IMAGE 1. Apply every garment piece in its natural position (top on torso, bottom on legs, dupatta draped over shoulders/across body, etc.). Do not skip or omit any piece.
+
+If the outfit is longer or wider than what fits in the customer's frame (e.g. a floor-length lehenga in a half-body photo), CROP the outfit at the original frame edges — DO NOT zoom out, DO NOT add canvas above the head or below the feet. The customer's head/face/pose stays anchored at its original position and size.
+
+BACKGROUND must remain identical to IMAGE 2. When the new outfit has a different silhouette and reveals areas that were hidden behind the customer's original clothes (floor under the hem, walls beside a flaring skirt, ceiling above raised arms, etc.), seamlessly extend the EXACT floor/wall/lighting from the rest of IMAGE 2 into those revealed areas. Match the same texture, color, perspective, and shadow direction as the visible parts of the photo. Do not blur, distort, smudge, or invent new background detail. The customer's feet must stay on the floor at the same place — do not float them or crop the dress's hem in mid-air.
+
+OUTPUT: IMAGE 2's exact canvas with the customer wearing the full outfit from IMAGE 1. Face, head size, pose, body, background (including all newly-visible floor/wall around the new garment), and framing unchanged.` },
+          { text: 'IMAGE 1 — ISOLATED OUTFIT (all pieces):' },
           { inlineData: { data: garment.data, mimeType: garment.mimeType } },
-          { text: 'IMAGE 2 — the file you are editing. Output dimensions = this file\'s dimensions. Face position = this file\'s face position. Background = this file\'s background.' },
+          { text: 'IMAGE 2 — CUSTOMER PHOTO (this is your output canvas — same dimensions, same framing, same head position and size):' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
-          { text: 'Output: IMAGE 2 with only the clothing pixels replaced by IMAGE 1\'s outfit. Same canvas, same face position, same face size, same background. Treat this as a Photoshop layer edit, not a new image.' },
+          { text: 'Now output IMAGE 2 with the customer dressed in the complete outfit from IMAGE 1. Every piece in IMAGE 1 must appear on the customer. Face, head size, pose, body, background, and the exact frame/crop of IMAGE 2 must remain unchanged. Do NOT add canvas space to fit the outfit — crop the outfit at the frame edges if needed. CRITICALLY: where the new outfit reveals floor or wall that the customer\'s original clothes were hiding, extend the exact same floor and wall texture seamlessly from the rest of the photo — do not invent, blur, or distort the background. Feet stay on the floor at the same position.' },
         ],
       },
     ],
