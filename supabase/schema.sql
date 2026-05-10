@@ -202,6 +202,7 @@ CREATE TABLE IF NOT EXISTS tryon_reports (
   message         TEXT,                                       -- free-text user note
   screenshot_url  TEXT,                                       -- optional uploaded screenshot
   result_url      TEXT,                                       -- the try-on image being reported (if any)
+  user_photo_url  TEXT,                                       -- customer's input photo (saved on report only — for admin/AI review)
   source          TEXT NOT NULL DEFAULT 'customer'
                     CHECK (source IN ('customer','brand','admin')),
   -- Admin review state

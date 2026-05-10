@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { uploadReportUserPhoto } from '@/lib/storage';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -38,32 +39,43 @@ type ReportSource = typeof VALID_SOURCES[number];
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => ({}));
-    const {
-      type,
-      source,
-      rating,
-      reason,
-      message,
-      screenshot_url,
-      result_url,
-      brand_id,
-      tryon_id,
-      product_id,
-      qr_id,
-    } = body as {
-      type?: string;
-      source?: string;
-      rating?: number;
-      reason?: string;
-      message?: string;
-      screenshot_url?: string;
-      result_url?: string;
-      brand_id?: string;
-      tryon_id?: string;
-      product_id?: string;
-      qr_id?: string;
-    };
+    // Support both JSON (legacy) and multipart/form-data (new — carries the
+    // customer's input photo for "bad try-on" reports so admin can compare
+    // before vs. after).
+    const contentType = request.headers.get('content-type') ?? '';
+    let type: string | undefined;
+    let source: string | undefined;
+    let rating: number | undefined;
+    let reason: string | undefined;
+    let message: string | undefined;
+    let screenshot_url: string | undefined;
+    let result_url: string | undefined;
+    let brand_id: string | undefined;
+    let tryon_id: string | undefined;
+    let product_id: string | undefined;
+    let qr_id: string | undefined;
+    let userPhotoFile: File | null = null;
+
+    if (contentType.includes('multipart/form-data')) {
+      const fd = await request.formData();
+      type           = fd.get('type')?.toString();
+      source         = fd.get('source')?.toString();
+      const ratingStr = fd.get('rating')?.toString();
+      rating         = ratingStr ? Number(ratingStr) : undefined;
+      reason         = fd.get('reason')?.toString();
+      message        = fd.get('message')?.toString();
+      screenshot_url = fd.get('screenshot_url')?.toString();
+      result_url     = fd.get('result_url')?.toString();
+      brand_id       = fd.get('brand_id')?.toString();
+      tryon_id       = fd.get('tryon_id')?.toString();
+      product_id     = fd.get('product_id')?.toString();
+      qr_id          = fd.get('qr_id')?.toString();
+      const photo    = fd.get('user_photo');
+      if (photo instanceof File && photo.size > 0) userPhotoFile = photo;
+    } else {
+      const body = await request.json().catch(() => ({}));
+      ({ type, source, rating, reason, message, screenshot_url, result_url, brand_id, tryon_id, product_id, qr_id } = body);
+    }
 
     if (!type || !VALID_TYPES.includes(type as ReportType)) {
       return NextResponse.json(
@@ -101,6 +113,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Upload the customer's input photo to storage so admin can review it
+    // alongside the AI result. Best-effort: a storage failure shouldn't block
+    // the report from being recorded.
+    let userPhotoUrl: string | null = null;
+    if (userPhotoFile && brand_id) {
+      try {
+        const buf = Buffer.from(await userPhotoFile.arrayBuffer());
+        userPhotoUrl = await uploadReportUserPhoto(buf, brand_id, userPhotoFile.type || 'image/jpeg');
+      } catch (e) {
+        console.error('[reports] User photo upload failed:', e);
+      }
+    }
+
     const { data, error } = await supabase
       .from('tryon_reports')
       .insert({
@@ -111,6 +136,7 @@ export async function POST(request: NextRequest) {
         message: message?.trim() || null,
         screenshot_url: screenshot_url?.trim() || null,
         result_url: result_url?.trim() || null,
+        user_photo_url: userPhotoUrl,
         brand_id: brand_id || null,
         tryon_id: tryon_id || null,
         product_id: product_id || null,

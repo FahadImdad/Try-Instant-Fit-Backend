@@ -117,6 +117,31 @@ export async function uploadPaymentScreenshot(
   return `https://storage.googleapis.com/${bucketName}/${fileName}`;
 }
 
+/**
+ * Save a customer's input photo when they submit a "bad try-on" report.
+ * Normally the input photo is ephemeral and never stored — but if a user
+ * is unhappy with the AI result, we keep their photo alongside the report
+ * so admin/AI ops can compare before vs. after and tune the model. Lives
+ * under reports/ so it can be lifecycled separately from try-on assets.
+ */
+export async function uploadReportUserPhoto(
+  imageBuffer: Buffer,
+  brandId: string,
+  mimeType = 'image/jpeg'
+): Promise<string> {
+  const bucketName = process.env.GOOGLE_CLOUD_BUCKET_NAME;
+  if (!bucketName) throw new Error('GOOGLE_CLOUD_BUCKET_NAME is required');
+  const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+  const fileName = `reports/${brandId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const bucket = getStorage().bucket(bucketName);
+  await bucket.file(fileName).save(imageBuffer, {
+    contentType: mimeType,
+    metadata: { cacheControl: 'public, max-age=31536000' },
+    public: true,
+  });
+  return `https://storage.googleapis.com/${bucketName}/${fileName}`;
+}
+
 export async function uploadTryOnResult(
   imageBuffer: Buffer,
   brandId: string,

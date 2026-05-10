@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       .from('tryon_reports')
       .select(`
         id, brand_id, tryon_id, product_id, qr_id,
-        type, rating, reason, message, screenshot_url, result_url, source,
+        type, rating, reason, message, screenshot_url, result_url, user_photo_url, source,
         status, resolved_by, resolved_at, resolution_note,
         credit_refunded, refund_at, created_at,
         brand:brands ( id, name, email )
