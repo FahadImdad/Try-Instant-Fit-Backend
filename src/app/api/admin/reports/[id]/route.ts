@@ -83,9 +83,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }
 
       // Read back the resolved report so the admin UI can update its row
-      const { data: report, error: readErr } = await supabase
+      const { data: report, error: readBackErr } = await supabase
         .from('tryon_reports').select('*').eq('id', id).single();
-      if (readErr) throw readErr;
+      if (readBackErr) throw readBackErr;
 
       return NextResponse.json(
         { report, refund: refundData?.[0] ?? null },

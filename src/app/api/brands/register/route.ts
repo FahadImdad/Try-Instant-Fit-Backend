@@ -174,10 +174,11 @@ export async function POST(request: NextRequest) {
     if (brandError) throw brandError;
 
     // Upload logo if provided (validated above — best-effort against storage errors)
+    let logoUrl: string | null = null;
     if (logoFile && logoFile.size > 0) {
       try {
         const buf = Buffer.from(await logoFile.arrayBuffer());
-        const logoUrl = await uploadBrandLogo(buf, brand.id, logoFile.type);
+        logoUrl = await uploadBrandLogo(buf, brand.id, logoFile.type);
         await supabase.from('brands').update({ logo_url: logoUrl }).eq('id', brand.id);
       } catch (e) {
         console.error('[register] Logo upload failed:', e);
