@@ -11,14 +11,35 @@ export async function GET(request: NextRequest) {
   if (unauthorized) return unauthorized;
 
   try {
-    const { data: brands, error } = await supabase
-      .from('brands')
-      .select('id, name, email, website_url, status, tryon_credits, tryon_credits_used, price_per_tryon_usd, unlimited, created_at')
-      .order('created_at', { ascending: false });
+    const [{ data: brands, error: brandsError }, { data: summary, error: summaryError }] = await Promise.all([
+      supabase
+        .from('brands')
+        .select('id, name, email, website_url, status, tryon_credits, tryon_credits_used, price_per_tryon_usd, unlimited, created_at')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('brand_credit_summary')
+        .select('brand_id, tryon_count, process_count, refund_count'),
+    ]);
 
-    if (error) throw error;
+    if (brandsError) throw brandsError;
+    if (summaryError) throw summaryError;
 
-    return NextResponse.json({ brands: brands ?? [] }, { status: 200, headers: ADMIN_CORS });
+    // Merge per-brand try-on vs product-upload breakdown into the brand objects.
+    // tryon_count = customer try-ons; process_count = product-image uploads processed.
+    const summaryByBrand = new Map(
+      (summary ?? []).map((s: { brand_id: string; tryon_count: number; process_count: number; refund_count: number }) => [s.brand_id, s])
+    );
+    const enriched = (brands ?? []).map((b) => {
+      const s = summaryByBrand.get(b.id);
+      return {
+        ...b,
+        tryon_count: s?.tryon_count ?? 0,
+        process_count: s?.process_count ?? 0,
+        refund_count: s?.refund_count ?? 0,
+      };
+    });
+
+    return NextResponse.json({ brands: enriched }, { status: 200, headers: ADMIN_CORS });
   } catch (error) {
     console.error('[admin/brands GET]', error);
     return NextResponse.json({ error: 'Failed to load brands' }, { status: 500, headers: ADMIN_CORS });
