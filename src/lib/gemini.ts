@@ -196,33 +196,18 @@ Output: the complete outfit (all clothing pieces together) on a white background
 export async function geminiTryOn(
   userPhotoBase64: string,
   userMimeType: string,
-  productBase64: string,
-  productMimeType: string,
-  cachedGarment?: { data: string; mimeType: string },
+  garment: { data: string; mimeType: string },
   model = TRYON_MODEL_FALLBACK,
   maxDim = 512
-): Promise<{ data: string; mimeType: string; model: string; isolatedGarment?: { data: string; mimeType: string } }> {
-  // Preprocess each image at most once. The user photo is always needed
-  // for step 2. The product image is only needed for step 1 (garment
-  // isolation) — when we have a cached garment we skip preprocessing it.
+): Promise<{ data: string; mimeType: string; model: string }> {
+  // Single-step try-on. The garment must already be isolated upstream
+  // (at product upload / QR generation). The try-on path never isolates
+  // inline; if no cached garment exists, the caller must fail fast.
   const userPhoto = await preprocessImage(userPhotoBase64, userMimeType, maxDim);
   userPhotoBase64 = userPhoto.base64;
   userMimeType = userPhoto.mimeType;
 
-  let garment: { data: string; mimeType: string };
-  let freshlyIsolated = false;
-
-  if (cachedGarment) {
-    console.log('[try-on] Using cached isolated garment, skipping Step 1.');
-    garment = cachedGarment;
-  } else {
-    console.log('[try-on] Step 1: Preprocessing product + isolating garment...');
-    const productImg = await preprocessImage(productBase64, productMimeType, maxDim);
-    garment = await isolateGarment(productImg.base64, productImg.mimeType, model);
-    freshlyIsolated = true;
-  }
-
-  console.log('[try-on] Step 2: Applying garment to person...');
+  console.log('[try-on] Applying isolated garment to customer photo...');
 
   // Step 2: Apply isolated outfit to customer photo
   const result = await callGemini({
@@ -285,6 +270,5 @@ OUTPUT: IMAGE 2 with the SAME person, same face/features/skin/hair/body/pose/bac
     data: imagePart.inlineData.data,
     mimeType: imagePart.inlineData.mimeType ?? 'image/jpeg',
     model,
-    isolatedGarment: freshlyIsolated ? garment : undefined,
   };
 }

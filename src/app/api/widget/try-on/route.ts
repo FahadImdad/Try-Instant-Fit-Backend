@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { geminiTryOn, TRYON_MODEL_FALLBACK } from '@/lib/gemini';
-import { uploadTryOnResult, uploadIsolatedGarment } from '@/lib/storage';
+import { uploadTryOnResult } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 
-// 90s timeout — Gemini try-on can take up to ~60s for the 2-step flow.
-export const maxDuration = 90;
+// 60s timeout — single-call try-on, garment is pre-isolated at upload time.
+export const maxDuration = 60;
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -82,58 +82,56 @@ export async function POST(request: NextRequest) {
     const userPhotoBuffer = Buffer.from(await userPhotoFile.arrayBuffer());
     const userPhotoBase64 = userPhotoBuffer.toString('base64');
 
-    // ── Fetch and convert product image ────────────────────────────────────
-    const productResponse = await fetch(productImageUrl, {
-      headers: { 'User-Agent': 'TryInstantFit/1.0' },
-    });
-    if (!productResponse.ok) {
-      return NextResponse.json({ error: 'Could not fetch product image. Please try again.' }, { status: 400 });
+    // ── Require pre-isolated garment (no inline isolation at try-on time) ──
+    // Garments are isolated upstream at product upload / QR creation.
+    // If the cache row is missing, fail fast — the brand needs to re-upload
+    // from the editor instead of paying for an inline isolation here.
+    if (!productId) {
+      return NextResponse.json({
+        error: 'product_id is required for try-on.',
+        code: 'PRODUCT_ID_REQUIRED',
+      }, { status: 400 });
     }
-    const productBuffer = Buffer.from(await productResponse.arrayBuffer());
-    const productBase64 = productBuffer.toString('base64');
 
-    // ── Call Gemini try-on (single path, no fallback) ─────────────────────
-    console.log(`[try-on] Using Gemini at ${maxDim}px`);
+    const { data: cacheRow } = await supabase
+      .from('product_garments')
+      .select('isolated_garment_url, mime_type')
+      .eq('product_id', productId)
+      .eq('brand_id', brandId)
+      .single();
 
-    const productMimeType = (productResponse.headers.get('content-type') ?? 'image/jpeg').split(';')[0];
-
-    let usedGarmentCache = false;
-
-    // ── Check for cached isolated garment ──────────────────────────────────
-    let cachedGarment: { data: string; mimeType: string } | undefined;
-    if (productId) {
-      const { data: cacheRow } = await supabase
-        .from('product_garments')
-        .select('isolated_garment_url, mime_type')
-        .eq('product_id', productId)
-        .eq('brand_id', brandId)
-        .single();
-
-      if (cacheRow?.isolated_garment_url) {
-        try {
-          const resp = await fetch(cacheRow.isolated_garment_url);
-          if (resp.ok) {
-            const buf = Buffer.from(await resp.arrayBuffer());
-            cachedGarment = { data: buf.toString('base64'), mimeType: cacheRow.mime_type ?? 'image/jpeg' };
-            usedGarmentCache = true;
-            console.log('[try-on] Cache hit: using cached isolated garment for product:', productId);
-          }
-        } catch { /* ignore — will re-isolate */ }
-      }
+    if (!cacheRow?.isolated_garment_url) {
+      return NextResponse.json({
+        error: 'This product has not been processed yet. Please re-upload its image from the brand editor and try again.',
+        code: 'GARMENT_NOT_READY',
+      }, { status: 422 });
     }
+
+    let garment: { data: string; mimeType: string };
+    try {
+      const resp = await fetch(cacheRow.isolated_garment_url);
+      if (!resp.ok) throw new Error(`fetch failed: ${resp.status}`);
+      const buf = Buffer.from(await resp.arrayBuffer());
+      garment = { data: buf.toString('base64'), mimeType: cacheRow.mime_type ?? 'image/jpeg' };
+    } catch (err) {
+      console.error('[try-on] Failed to load cached garment:', err);
+      return NextResponse.json({
+        error: 'We could not load the processed product image. Please try again in a moment.',
+        code: 'GARMENT_FETCH_FAILED',
+      }, { status: 502 });
+    }
+
+    console.log(`[try-on] Using cached isolated garment at ${maxDim}px (product=${productId})`);
 
     const geminiResult = await geminiTryOn(
       userPhotoBase64,
       userPhotoFile.type,
-      productBase64,
-      productMimeType,
-      cachedGarment,
+      garment,
       TRYON_MODEL_FALLBACK,  // locked — do not accept overrides from the client
       maxDim
     );
     const resultBase64 = geminiResult.data;
     const resultMimeType = geminiResult.mimeType;
-    const isolatedGarmentResult = geminiResult.isolatedGarment;
     const usedGeminiModel = geminiResult.model;
 
     const aiModel = usedGeminiModel ?? TRYON_MODEL_FALLBACK;
@@ -145,27 +143,9 @@ export async function POST(request: NextRequest) {
 
     const processingTimeMs = Date.now() - startTime;
 
-    // ── Cache isolated garment (fire-and-forget) ────────────────────────────
-    if (isolatedGarmentResult && productId) {
-      (async () => {
-        try {
-          const garmentBuffer = Buffer.from(isolatedGarmentResult!.data, 'base64');
-          const garmentUrl = await uploadIsolatedGarment(garmentBuffer, productId, isolatedGarmentResult!.mimeType);
-          await supabase.from('product_garments').upsert({
-            product_id:             productId,
-            brand_id:               brandId,
-            isolated_garment_url:   garmentUrl,
-            mime_type:              isolatedGarmentResult!.mimeType,
-          }, { onConflict: 'product_id,brand_id' });
-          console.log('[try-on] Cached isolated garment for product:', productId);
-        } catch (err) {
-          console.error('[try-on] Failed to cache garment:', err);
-        }
-      })();
-    }
-
     // ── Save to Supabase ────────────────────────────────────────────────────
     // For Scan & Wear we need the inserted row's id to link in qr_scans, so we await.
+    // Cost is single-call (isolation happens upstream at upload time).
     const tryonInsert = await supabase
       .from('tryons')
       .insert({
@@ -178,12 +158,11 @@ export async function POST(request: NextRequest) {
         cost_usd:           (() => {
           const m = usedGeminiModel ?? '';
           const r = maxDim; // 512 | 1024 | 2048 | 4096
-          const perImg = m.includes('pro')
-            ? (r <= 512 ? 0.134 : r <= 1024 ? 0.134 : r <= 2048 ? 0.134 : 0.24)
+          return m.includes('pro')
+            ? (r <= 2048 ? 0.134 : 0.24)
             : m.includes('2.5-flash')
               ? (r <= 512 ? 0.022 : r <= 1024 ? 0.034 : r <= 2048 ? 0.050 : 0.076)
               : (r <= 512 ? 0.045 : r <= 1024 ? 0.067 : r <= 2048 ? 0.101 : 0.151);
-          return usedGarmentCache ? perImg : perImg * 2;
         })(),
         source,
       })
