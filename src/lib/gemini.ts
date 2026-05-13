@@ -94,9 +94,19 @@ OTHER RULES:
 - Each piece at full size, clearly visible, no overlap that hides detail.
 - CRITICAL — preserve the EXACT colors of every piece: if the kameez is green and the dupatta is green-with-gold-embroidery, both must keep those exact colors. Do not lighten, darken, or shift any color.
 - Preserve all details exactly: fabric texture, collar style, sleeve length, buttons, embroidery, prints, patterns, cut, and length — for every piece.
-- DO NOT alter the design of any garment. The garments are brand products; render them faithfully as-is. Do NOT extend a top's length, do NOT change a hem, do NOT add fabric, do NOT shift a waistband, do NOT continue a pattern beyond its original boundary, do NOT modify a cut or silhouette. Reproduce each piece exactly as designed in the original photo — even if you might think a different cut "would look better."
+- DO NOT alter the design of any garment. The garments are brand products; reproduce them as-is. Do NOT extend a top's length, do NOT change a hem, do NOT add fabric, do NOT shift a waistband, do NOT continue a pattern beyond its original boundary, do NOT modify a cut or silhouette. Render each piece exactly as designed in the original photo.
 
-Output: the complete outfit (all clothing pieces together) on a white background, posed NEUTRALLY (hanger / flat-lay style — never the model's pose), with every piece's design, color, cut, length, and details intact — exactly as the brand made it.`,
+LAYOUT — NO GAP ONLY WHEN THE SOURCE SHOWS MIDRIFF (conditional, positioning only — never a design change):
+If — and ONLY if — the original photo shows the model with visible MIDRIFF / STOMACH between the top and bottom (cropped choli + low-rise lehenga, crop top + jeans, short blouse + skirt, sleeveless midriff-baring cut), POSITION the top and the bottom touching at the waist in the flat-lay output. The top's existing hem sits just above (or slightly overlapping) the bottom's existing waistband — no empty white space between them, no midriff gap in the reference image.
+
+If the original photo does NOT show midriff (long kameez, full kurta, maxi, abaya, gown, modest cut, long shirt + trousers, top that already overlaps the bottom), the trigger is NOT present — lay the pieces out with their NATURAL spacing as in the original. Do not force them together.
+
+This is a layout / positioning choice for the reference image — it is NOT a design change:
+- Both pieces remain EXACTLY as designed: actual length, hem shape, embroidery line, waistband, cut — all UNCHANGED.
+- You're only adjusting WHERE the pieces sit relative to each other in the flat-lay when the trigger fires.
+- DO NOT extend, redraw, or add anything to either piece — just slide them together until they touch.
+
+Output: the complete outfit (all pieces together) on a white background, posed NEUTRALLY (hanger / flat-lay style — never the model's pose), every piece's design / color / details exact, and (only when the source shows midriff) the top + bottom laid out touching at the waist so no midriff gap appears in the reference image.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
