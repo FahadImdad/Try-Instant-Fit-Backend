@@ -174,8 +174,7 @@ Your task: output an image of the COMPLETE OUTFIT — every visible clothing ite
 - Show the outfit flat or as if on an invisible hanger/dress form, at full size, with each piece clearly visible
 - CRITICAL — preserve the EXACT colors of every piece: if the kameez is sky blue and the dupatta is maroon, both must keep those exact colors in the output. Do not lighten, darken, or shift any color.
 - Preserve all details exactly: fabric texture, collar style, sleeve length, buttons, embroidery, prints, patterns, cut, and length — for every piece
-- MIDRIFF COVERAGE (conditional — trigger: top is a crop cut that would leave a midriff gap with the bottom): If the top piece is a cropped choli, short blouse, crop top, or any cut whose length stops above the bottom piece's waistband (so a real wearer would show bare midriff), EXTEND the top downward using its OWN fabric, color, pattern, embroidery, and embellishment so it reaches and overlaps the bottom's waistband — no skin gap. Keep the same neckline, sleeves, and design; only the lower hem is lengthened so the top + bottom meet seamlessly. If the top already reaches or overlaps the bottom (long kameez, full kurta, abaya, maxi, gown, long shirt), DO NOT alter its length — keep it exactly as shown in the original. The trigger fires ONLY when the original garment design would leave bare midriff; otherwise this rule is a no-op.
-Output: the complete outfit (all clothing pieces together) on a white background, with every piece's exact original color and details intact, and the top piece extended to meet the bottom if the original design would otherwise leave a midriff gap.`,
+Output: the complete outfit (all clothing pieces together) on a white background, with every piece's exact original color and details intact.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
@@ -234,7 +233,7 @@ HOW THESE RULES APPLY (read this first):
 • ALWAYS-ON (apply to every try-on, no matter the inputs): IDENTITY LOCK, FRAME-AWARE COVERAGE, NATURAL FIT.
 • CONDITIONAL (apply ONLY when its specific trigger is present; otherwise do nothing): QUALITY UPLIFT (trigger = IMAGE 2 is visibly blurry/soft/low-resolution).
 • If a conditional rule's trigger is not present in the actual inputs, it is a NO-OP — do not invent reasons to apply it, do not sharpen a sharp photo.
-• IMAGE 1 is already a finished, garment-correct reference (the isolation step has already handled things like midriff coverage on crop cuts). Render IMAGE 1 faithfully on the customer — do not redesign, restyle, or "fix" the outfit.
+• IMAGE 1 is already a finished, garment-correct reference. Render it faithfully on the customer — do not redesign, restyle, or "fix" the outfit.
 
 IDENTITY LOCK (always): The person in the output MUST be the SAME person from IMAGE 2 — same face, same features (eyes, nose, lips, jawline, eyebrows), same skin texture and tone, same hair, same body shape, same height, same pose. Do NOT smooth, retouch, beautify, slim, or alter the face or body in any way. The customer must be recognizable as the SAME individual — pixel-faithful to the customer photo. No "improving" the face. No swapping the person for a model.
 
