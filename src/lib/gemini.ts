@@ -75,44 +75,19 @@ export async function isolateGarment(
         role: 'user',
         parts: [
           {
-            text: `This is a product catalog photo showing a model or mannequin wearing one or more garments (an outfit).
+            text: `Turn this product photo into a flat-lay reference of the outfit on a pure white background. No model, no body, no pose.
 
-Your task: output an image of the COMPLETE OUTFIT — every visible clothing item — isolated together on a plain white background, in a NEUTRAL product-display orientation. Treat this like a clean e-commerce ghost-mannequin / hanger shot, NOT a styled photo.
+Include every garment piece, fully visible:
+- Top: flat, symmetrical, sleeves down.
+- Bottom: full width and full length, spread out.
+- Dupatta / scarf: fully unfolded and spread flat. Every detail visible.
+- Any other piece (jacket, vest, belt): include it.
 
-CRITICAL LAYOUT RULE (read first — most common failure on this prompt):
-When you place the top and bottom on the canvas, the top's BOTTOM edge and the bottom's TOP edge MUST TOUCH or OVERLAP. There must be ZERO empty white pixels between them — they are stacked tightly together like books on a shelf, not floating apart with space in between.
+Reproduce each piece EXACTLY as in the source: same colors, fabric, embroidery, prints, patterns, cut, length, hem, neckline, sleeves. Do not redesign, restyle, or alter anything.
 
-This applies whenever the source photo shows the model with visible midriff/stomach (cropped choli + low-rise lehenga, crop top + jeans, short blouse + skirt, any midriff-baring cut). Spatial example to be unambiguous: if the choli's bottom hem renders at Y=400 in the output, the lehenga's waistband must start at Y=400 (touching) or Y=395 (5-pixel overlap). It MUST NOT start at Y=420 with 20 pixels of white space in between — that white gap is the bug.
+If the source shows bare midriff between the top and the bottom, place the top's hem TOUCHING the bottom's waistband on the canvas — zero white space between them. The pieces themselves stay unchanged; only their position changes. If the source already covers the midriff, lay them out with natural spacing.
 
-If — AND ONLY IF — the original photo shows the top and bottom already overlapping naturally with no midriff (long kameez, full kurta, maxi, abaya, gown, modest cut, long shirt + trousers), then lay them out with their natural spacing — do not force together.
-
-How to achieve the touching layout WITHOUT changing the garments:
-- The TOP keeps its actual length, hem shape, embroidery line — UNCHANGED.
-- The BOTTOM keeps its actual waistband, cut, length — UNCHANGED.
-- DO NOT extend the top's hem downward, do NOT add fabric or embroidery to fill the gap, do NOT redraw the hem, do NOT shift the waistband.
-- You're just choosing WHERE on the canvas to place each piece. Place them touching. That's it.
-
-POSE-FREE PRESENTATION (critical — common failure mode):
-- Do NOT copy the model's pose in any form. IGNORE the model's body angle, arm position, hand placement, leg stance, hip tilt, head tilt, or any walking/twisting/turning posture in the original photo.
-- The garment must NOT retain any sense of a body inside it. No body-shaped silhouette, no implied hips/chest/shoulders, no pose-induced draping or folds.
-- Kameez / top / kurta / shirt / jacket: render it STRAIGHT and SYMMETRICAL, as if hanging on an invisible hanger, FULLY SPREAD so the entire piece is visible. Sleeves hang naturally DOWN at the sides — not splayed out, not bent at the elbow, not crossed in front, not raised.
-- Bottom (shalwar / trousers / pants / skirt / lehenga): render it STRAIGHT and SYMMETRICAL, neutral fall, FULL WIDTH and FULL LENGTH visible — for a lehenga or full skirt, spread the entire flare so the whole pattern, embroidery border, and hem are clearly shown. Not bunched, not folded, not partially behind another piece.
-- Dupatta / scarf / shawl: show it FULLY UNFOLDED and SPREAD FLAT beside the outfit — the ENTIRE piece visible (full length, full width, both edges, both borders, all embroidery, all patterns, the centre field, every detail). Do NOT fold it into a small square, do NOT bunch it, do NOT show only a corner, do NOT drape it across the body as the model wore it. The dupatta is a separate piece that must be reproducible in full from this reference alone.
-
-SHOW EVERY PIECE IN FULL (no assumptions):
-The downstream try-on step renders this reference faithfully — it does NOT guess or fill in missing parts of a garment. So every garment piece must be FULLY VISIBLE here, with EVERY detail readable: full neckline, full hemline, full embroidery field, every border, every embellishment, every pattern repeat, every panel. If any part of a garment is hidden, folded, cropped, or obscured in your output, the try-on step will guess that part wrong. Lay each piece out so a designer could reproduce it exactly from your reference image alone.
-
-OTHER RULES:
-- Remove the model/mannequin entirely — keep ONLY the clothing.
-- Remove the background — pure white.
-- KEEP EVERY garment piece visible in the photo: top, kameez, shirt, kurta, bottom, trousers, shalwar, pants, skirt, dupatta, scarf, jacket, vest, belt — all of them.
-- Do NOT drop, hide, or omit any clothing piece. If it's a 3-piece (kameez + shalwar + dupatta), output all three. If it's a 2-piece (top + bottom), output both.
-- Each piece at full size, clearly visible, no overlap that hides detail (except for the top + bottom touching at the waist per the layout rule above).
-- CRITICAL — preserve the EXACT colors of every piece: if the kameez is red and the dupatta is red-with-gold-embroidery, both must keep those exact colors. Do not lighten, darken, or shift any color.
-- Preserve all details exactly: fabric texture, collar style, sleeve length, buttons, embroidery, prints, patterns, cut, and length — for every piece.
-- DO NOT alter the design of any garment. Garments are brand products; reproduce them as-is. The ONLY freedom you have is WHERE on the canvas to position each piece (per the layout rule). You do NOT have freedom to extend lengths, change hems, add fabric, shift waistbands, continue patterns, or modify cuts.
-
-Output: the complete outfit (all pieces together) on a white background, posed NEUTRALLY (hanger / flat-lay style — never the model's pose), every piece's design / color / details exact, and the top + bottom laid out TOUCHING at the waist (zero white pixels between them) whenever the source shows midriff.`,
+Output: the outfit on white, flat-lay, every piece fully visible, faithful to the original.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
