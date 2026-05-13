@@ -77,15 +77,25 @@ export async function isolateGarment(
           {
             text: `This is a product catalog photo showing a model or mannequin wearing one or more garments (an outfit).
 
-Your task: output an image of the COMPLETE OUTFIT — every visible clothing item on the model — isolated together on a plain white background.
-- Remove the model/mannequin entirely — keep ONLY the clothing
-- Remove the background
-- KEEP EVERY garment piece visible in the photo: top, kameez, shirt, kurta, bottom, trousers, shalwar, pants, skirt, dupatta, scarf, jacket, vest, belt — all of them, arranged together in their natural relative positions (top above bottom, dupatta draped or alongside, etc.)
-- Do NOT drop, hide, or omit any clothing piece. If the model is wearing a 3-piece suit (kameez + shalwar + dupatta), output all three. If it's a 2-piece (top + bottom), output both.
-- Show the outfit flat or as if on an invisible hanger/dress form, at full size, with each piece clearly visible
-- CRITICAL — preserve the EXACT colors of every piece: if the kameez is sky blue and the dupatta is maroon, both must keep those exact colors in the output. Do not lighten, darken, or shift any color.
-- Preserve all details exactly: fabric texture, collar style, sleeve length, buttons, embroidery, prints, patterns, cut, and length — for every piece
-Output: the complete outfit (all clothing pieces together) on a white background, with every piece's exact original color and details intact.`,
+Your task: output an image of the COMPLETE OUTFIT — every visible clothing item — isolated together on a plain white background, in a NEUTRAL product-display orientation. Treat this like a clean e-commerce ghost-mannequin / hanger shot, NOT a styled photo.
+
+POSE-FREE PRESENTATION (critical — common failure mode):
+- Do NOT copy the model's pose in any form. IGNORE the model's body angle, arm position, hand placement, leg stance, hip tilt, head tilt, or any walking/twisting/turning posture in the original photo.
+- The garment must NOT retain any sense of a body inside it. No body-shaped silhouette, no implied hips/chest/shoulders, no pose-induced draping or folds.
+- Kameez / top / kurta / shirt / jacket: render it STRAIGHT and SYMMETRICAL, as if hanging on an invisible hanger. Sleeves hang naturally DOWN at the sides — not splayed out, not bent at the elbow, not crossed in front, not raised.
+- Bottom (shalwar / trousers / pants / skirt / lehenga): render it STRAIGHT and SYMMETRICAL, neutral fall — legs together, not bent at the knees, not in a stride, not twisted.
+- Dupatta / scarf / shawl: show it as a SEPARATE PIECE — either neatly folded/draped beside the outfit, or draped symmetrically over an invisible neckline (centered, both sides equal). NOT slung over one shoulder, NOT wrapped across the body as the model wore it.
+
+OTHER RULES:
+- Remove the model/mannequin entirely — keep ONLY the clothing.
+- Remove the background — pure white.
+- KEEP EVERY garment piece visible in the photo: top, kameez, shirt, kurta, bottom, trousers, shalwar, pants, skirt, dupatta, scarf, jacket, vest, belt — all of them, arranged in their natural relative positions (top above bottom, dupatta beside or symmetrically draped, etc.).
+- Do NOT drop, hide, or omit any clothing piece. If it's a 3-piece (kameez + shalwar + dupatta), output all three. If it's a 2-piece (top + bottom), output both.
+- Each piece at full size, clearly visible, no overlap that hides detail.
+- CRITICAL — preserve the EXACT colors of every piece: if the kameez is green and the dupatta is green-with-gold-embroidery, both must keep those exact colors. Do not lighten, darken, or shift any color.
+- Preserve all details exactly: fabric texture, collar style, sleeve length, buttons, embroidery, prints, patterns, cut, and length — for every piece.
+
+Output: the complete outfit (all clothing pieces together) on a white background, posed NEUTRALLY (hanger / flat-lay style — never the model's pose), with every piece's exact original color and details intact.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
