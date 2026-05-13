@@ -79,6 +79,19 @@ export async function isolateGarment(
 
 Your task: output an image of the COMPLETE OUTFIT — every visible clothing item — isolated together on a plain white background, in a NEUTRAL product-display orientation. Treat this like a clean e-commerce ghost-mannequin / hanger shot, NOT a styled photo.
 
+CRITICAL LAYOUT RULE (read first — most common failure on this prompt):
+When you place the top and bottom on the canvas, the top's BOTTOM edge and the bottom's TOP edge MUST TOUCH or OVERLAP. There must be ZERO empty white pixels between them — they are stacked tightly together like books on a shelf, not floating apart with space in between.
+
+This applies whenever the source photo shows the model with visible midriff/stomach (cropped choli + low-rise lehenga, crop top + jeans, short blouse + skirt, any midriff-baring cut). Spatial example to be unambiguous: if the choli's bottom hem renders at Y=400 in the output, the lehenga's waistband must start at Y=400 (touching) or Y=395 (5-pixel overlap). It MUST NOT start at Y=420 with 20 pixels of white space in between — that white gap is the bug.
+
+If — AND ONLY IF — the original photo shows the top and bottom already overlapping naturally with no midriff (long kameez, full kurta, maxi, abaya, gown, modest cut, long shirt + trousers), then lay them out with their natural spacing — do not force together.
+
+How to achieve the touching layout WITHOUT changing the garments:
+- The TOP keeps its actual length, hem shape, embroidery line — UNCHANGED.
+- The BOTTOM keeps its actual waistband, cut, length — UNCHANGED.
+- DO NOT extend the top's hem downward, do NOT add fabric or embroidery to fill the gap, do NOT redraw the hem, do NOT shift the waistband.
+- You're just choosing WHERE on the canvas to place each piece. Place them touching. That's it.
+
 POSE-FREE PRESENTATION (critical — common failure mode):
 - Do NOT copy the model's pose in any form. IGNORE the model's body angle, arm position, hand placement, leg stance, hip tilt, head tilt, or any walking/twisting/turning posture in the original photo.
 - The garment must NOT retain any sense of a body inside it. No body-shaped silhouette, no implied hips/chest/shoulders, no pose-induced draping or folds.
@@ -89,24 +102,14 @@ POSE-FREE PRESENTATION (critical — common failure mode):
 OTHER RULES:
 - Remove the model/mannequin entirely — keep ONLY the clothing.
 - Remove the background — pure white.
-- KEEP EVERY garment piece visible in the photo: top, kameez, shirt, kurta, bottom, trousers, shalwar, pants, skirt, dupatta, scarf, jacket, vest, belt — all of them, arranged in their natural relative positions (top above bottom, dupatta beside or symmetrically draped, etc.).
+- KEEP EVERY garment piece visible in the photo: top, kameez, shirt, kurta, bottom, trousers, shalwar, pants, skirt, dupatta, scarf, jacket, vest, belt — all of them.
 - Do NOT drop, hide, or omit any clothing piece. If it's a 3-piece (kameez + shalwar + dupatta), output all three. If it's a 2-piece (top + bottom), output both.
-- Each piece at full size, clearly visible, no overlap that hides detail.
-- CRITICAL — preserve the EXACT colors of every piece: if the kameez is green and the dupatta is green-with-gold-embroidery, both must keep those exact colors. Do not lighten, darken, or shift any color.
+- Each piece at full size, clearly visible, no overlap that hides detail (except for the top + bottom touching at the waist per the layout rule above).
+- CRITICAL — preserve the EXACT colors of every piece: if the kameez is red and the dupatta is red-with-gold-embroidery, both must keep those exact colors. Do not lighten, darken, or shift any color.
 - Preserve all details exactly: fabric texture, collar style, sleeve length, buttons, embroidery, prints, patterns, cut, and length — for every piece.
-- DO NOT alter the design of any garment. The garments are brand products; reproduce them as-is. Do NOT extend a top's length, do NOT change a hem, do NOT add fabric, do NOT shift a waistband, do NOT continue a pattern beyond its original boundary, do NOT modify a cut or silhouette. Render each piece exactly as designed in the original photo.
+- DO NOT alter the design of any garment. Garments are brand products; reproduce them as-is. The ONLY freedom you have is WHERE on the canvas to position each piece (per the layout rule). You do NOT have freedom to extend lengths, change hems, add fabric, shift waistbands, continue patterns, or modify cuts.
 
-LAYOUT — NO GAP ONLY WHEN THE SOURCE SHOWS MIDRIFF (conditional, positioning only — never a design change):
-If — and ONLY if — the original photo shows the model with visible MIDRIFF / STOMACH between the top and bottom (cropped choli + low-rise lehenga, crop top + jeans, short blouse + skirt, sleeveless midriff-baring cut), POSITION the top and the bottom touching at the waist in the flat-lay output. The top's existing hem sits just above (or slightly overlapping) the bottom's existing waistband — no empty white space between them, no midriff gap in the reference image.
-
-If the original photo does NOT show midriff (long kameez, full kurta, maxi, abaya, gown, modest cut, long shirt + trousers, top that already overlaps the bottom), the trigger is NOT present — lay the pieces out with their NATURAL spacing as in the original. Do not force them together.
-
-This is a layout / positioning choice for the reference image — it is NOT a design change:
-- Both pieces remain EXACTLY as designed: actual length, hem shape, embroidery line, waistband, cut — all UNCHANGED.
-- You're only adjusting WHERE the pieces sit relative to each other in the flat-lay when the trigger fires.
-- DO NOT extend, redraw, or add anything to either piece — just slide them together until they touch.
-
-Output: the complete outfit (all pieces together) on a white background, posed NEUTRALLY (hanger / flat-lay style — never the model's pose), every piece's design / color / details exact, and (only when the source shows midriff) the top + bottom laid out touching at the waist so no midriff gap appears in the reference image.`,
+Output: the complete outfit (all pieces together) on a white background, posed NEUTRALLY (hanger / flat-lay style — never the model's pose), every piece's design / color / details exact, and the top + bottom laid out TOUCHING at the waist (zero white pixels between them) whenever the source shows midriff.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
