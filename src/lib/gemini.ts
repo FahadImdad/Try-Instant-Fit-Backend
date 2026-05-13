@@ -95,7 +95,9 @@ OTHER RULES:
 - CRITICAL — preserve the EXACT colors of every piece: if the kameez is green and the dupatta is green-with-gold-embroidery, both must keep those exact colors. Do not lighten, darken, or shift any color.
 - Preserve all details exactly: fabric texture, collar style, sleeve length, buttons, embroidery, prints, patterns, cut, and length — for every piece.
 
-Output: the complete outfit (all clothing pieces together) on a white background, posed NEUTRALLY (hanger / flat-lay style — never the model's pose), with every piece's exact original color and details intact.`,
+MIDRIFF COVERAGE (conditional — trigger: top is a crop cut that would otherwise leave a midriff gap with the bottom): If the top piece is a cropped choli, short blouse, crop top, or any cut whose length stops above the bottom piece's waistband (so a real wearer would show bare midriff), EXTEND the top downward using its OWN fabric, color, pattern, embroidery, and embellishment so it reaches and overlaps the bottom's waistband — no skin gap. Keep the SAME neckline, sleeves, and design — only the lower hem is lengthened so the top and bottom meet seamlessly. If the top already reaches or overlaps the bottom (long kameez, full kurta, abaya, maxi, gown, long shirt, long top), DO NOT alter its length — keep it exactly as shown in the original. The trigger fires ONLY when the original garment design would otherwise leave bare midriff; otherwise this rule is a no-op.
+
+Output: the complete outfit (all clothing pieces together) on a white background, posed NEUTRALLY (hanger / flat-lay style — never the model's pose), with every piece's exact original color and details intact, and the top piece extended to meet the bottom if the original design would otherwise leave a midriff gap.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
