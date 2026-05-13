@@ -95,9 +95,12 @@ How to achieve the touching layout WITHOUT changing the garments:
 POSE-FREE PRESENTATION (critical — common failure mode):
 - Do NOT copy the model's pose in any form. IGNORE the model's body angle, arm position, hand placement, leg stance, hip tilt, head tilt, or any walking/twisting/turning posture in the original photo.
 - The garment must NOT retain any sense of a body inside it. No body-shaped silhouette, no implied hips/chest/shoulders, no pose-induced draping or folds.
-- Kameez / top / kurta / shirt / jacket: render it STRAIGHT and SYMMETRICAL, as if hanging on an invisible hanger. Sleeves hang naturally DOWN at the sides — not splayed out, not bent at the elbow, not crossed in front, not raised.
-- Bottom (shalwar / trousers / pants / skirt / lehenga): render it STRAIGHT and SYMMETRICAL, neutral fall — legs together, not bent at the knees, not in a stride, not twisted.
-- Dupatta / scarf / shawl: show it as a SEPARATE PIECE — either neatly folded/draped beside the outfit, or draped symmetrically over an invisible neckline (centered, both sides equal). NOT slung over one shoulder, NOT wrapped across the body as the model wore it.
+- Kameez / top / kurta / shirt / jacket: render it STRAIGHT and SYMMETRICAL, as if hanging on an invisible hanger, FULLY SPREAD so the entire piece is visible. Sleeves hang naturally DOWN at the sides — not splayed out, not bent at the elbow, not crossed in front, not raised.
+- Bottom (shalwar / trousers / pants / skirt / lehenga): render it STRAIGHT and SYMMETRICAL, neutral fall, FULL WIDTH and FULL LENGTH visible — for a lehenga or full skirt, spread the entire flare so the whole pattern, embroidery border, and hem are clearly shown. Not bunched, not folded, not partially behind another piece.
+- Dupatta / scarf / shawl: show it FULLY UNFOLDED and SPREAD FLAT beside the outfit — the ENTIRE piece visible (full length, full width, both edges, both borders, all embroidery, all patterns, the centre field, every detail). Do NOT fold it into a small square, do NOT bunch it, do NOT show only a corner, do NOT drape it across the body as the model wore it. The dupatta is a separate piece that must be reproducible in full from this reference alone.
+
+SHOW EVERY PIECE IN FULL (no assumptions):
+The downstream try-on step renders this reference faithfully — it does NOT guess or fill in missing parts of a garment. So every garment piece must be FULLY VISIBLE here, with EVERY detail readable: full neckline, full hemline, full embroidery field, every border, every embellishment, every pattern repeat, every panel. If any part of a garment is hidden, folded, cropped, or obscured in your output, the try-on step will guess that part wrong. Lay each piece out so a designer could reproduce it exactly from your reference image alone.
 
 OTHER RULES:
 - Remove the model/mannequin entirely — keep ONLY the clothing.
