@@ -94,19 +94,9 @@ OTHER RULES:
 - Each piece at full size, clearly visible, no overlap that hides detail.
 - CRITICAL — preserve the EXACT colors of every piece: if the kameez is green and the dupatta is green-with-gold-embroidery, both must keep those exact colors. Do not lighten, darken, or shift any color.
 - Preserve all details exactly: fabric texture, collar style, sleeve length, buttons, embroidery, prints, patterns, cut, and length — for every piece.
+- DO NOT alter the design of any garment. The garments are brand products; render them faithfully as-is. Do NOT extend a top's length, do NOT change a hem, do NOT add fabric, do NOT shift a waistband, do NOT continue a pattern beyond its original boundary, do NOT modify a cut or silhouette. Reproduce each piece exactly as designed in the original photo — even if you might think a different cut "would look better."
 
-MIDRIFF COVERAGE — JUST MERGE THEM (conditional — trigger: short top whose lower hem doesn't reach the bottom's waistband):
-If the top piece is a cropped choli / short blouse / crop top and its hem ends above the bottom's waistband (so there would be a skin gap when worn), POSITION the top and the bottom so they TOUCH at the waist — the top's bottom hem sits right at or just slightly over the bottom's top edge, no skin visible between them. This is a LAYOUT adjustment only — NOT a design change.
-
-DO NOT redesign the garments to achieve this:
-- DO NOT extend the top's length, do NOT add extra fabric, do NOT add new embroidery, do NOT continue the pattern downward, do NOT redraw the hem.
-- DO NOT change the bottom's waistband height, do NOT add a higher waistline.
-- KEEP both pieces EXACTLY as designed in the original: same neckline, same sleeves, same top length, same hem curve, same embellishment line, same waistband, same color, same pattern.
-- The ONLY thing that changes is how the two pieces are positioned relative to each other in the output — they're shown touching instead of with a gap.
-
-If the top already reaches or overlaps the bottom naturally (long kameez, full kurta, abaya, maxi, gown, long shirt, long top), the trigger is NOT present — render exactly as shown in the original. The trigger fires ONLY when there would be a visible skin gap; otherwise this rule is a no-op.
-
-Output: the complete outfit (all clothing pieces together) on a white background, posed NEUTRALLY (hanger / flat-lay style — never the model's pose), every piece's design / color / details intact, and (if the trigger fires) the top and bottom merged at the waist so no midriff shows — without redesigning either piece.`,
+Output: the complete outfit (all clothing pieces together) on a white background, posed NEUTRALLY (hanger / flat-lay style — never the model's pose), with every piece's design, color, cut, length, and details intact — exactly as the brand made it.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
