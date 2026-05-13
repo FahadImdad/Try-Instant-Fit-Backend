@@ -134,6 +134,61 @@ export async function GET(
       .eq('brand_id', brandId)
       .eq('event_name', 'tryon_opened');
 
+    // ── Top-up history + rolling bar ──────────────────────────────────────────
+    // The brand dashboard wants two things:
+    //  1) A rolling progress bar whose `max` = the credit balance at the
+    //     moment of the most recent top-up. As try-ons happen, `current`
+    //     drains toward 0; when the brand tops up again, the bar resets.
+    //  2) A list of every top-up the brand has made, with per-batch FIFO
+    //     allocation so they can see how many credits from each batch have
+    //     been spent ("Oct 5 — 100 added · 60 used · 40 left").
+    //
+    // FIFO is the natural model: credits go in chronologically, get spent
+    // chronologically. We assign `tryon_credits_used` to each batch in
+    // creation order until allocation is exhausted.
+    const { data: topupRows } = await supabase
+      .from('brand_credit_topups')
+      .select('id, credits_added, amount_usd, payment_ref, notes, created_at')
+      .eq('brand_id', brandId)
+      .order('created_at', { ascending: true }); // oldest first for FIFO
+
+    let usedToAllocate = brand.tryon_credits_used || 0;
+    const topupsOldestFirst = (topupRows ?? []).map(t => {
+      const credits_added = Number(t.credits_added) || 0;
+      const used = Math.min(usedToAllocate, credits_added);
+      usedToAllocate -= used;
+      return {
+        id: t.id,
+        credits_added,
+        used,
+        remaining: credits_added - used,
+        amount_usd: t.amount_usd,
+        payment_ref: t.payment_ref,
+        notes: t.notes,
+        created_at: t.created_at,
+      };
+    });
+
+    const currentRemaining = brand.unlimited
+      ? null
+      : Math.max(0, (brand.tryon_credits || 0) - (brand.tryon_credits_used || 0));
+
+    // Rolling-bar max = credits in the pool at the moment of the most recent
+    // top-up = current remaining + everything used since that top-up.
+    // "Used since topup" = customer try-ons + product processing rows whose
+    // ts > last top-up's ts (both come out of the same balance).
+    let rolling_bar: { current: number; max: number; last_topup_at: string } | null = null;
+    if (topupsOldestFirst.length > 0 && currentRemaining !== null) {
+      const lastTopup = topupsOldestFirst[topupsOldestFirst.length - 1];
+      const lastTopupAt = new Date(lastTopup.created_at);
+      const usedSinceLastTopup = (allTryons ?? []).filter(r => new Date(r.created_at) > lastTopupAt).length;
+      rolling_bar = {
+        current: currentRemaining,
+        max: currentRemaining + usedSinceLastTopup,
+        last_topup_at: lastTopup.created_at,
+      };
+    }
+
     // ── Cached garments ──────────────────────────────────────────────────────
     const { data: garments } = await supabase
       .from('product_garments')
@@ -233,6 +288,15 @@ export async function GET(
           recent: recent.filter(r => r.source === 'digital-mirror').slice(0, 20),
           products: allProducts.filter(p => p.source === 'digital-mirror'),
         },
+      },
+      // Credits + top-up breakdown for the dashboard's rolling-bar + history view.
+      credits: {
+        unlimited: !!brand.unlimited,
+        total:     brand.tryon_credits || 0,
+        used:      brand.tryon_credits_used || 0,
+        remaining: currentRemaining,             // null when unlimited
+        rolling_bar,                              // null if the brand has no recorded top-ups
+        topups:    topupsOldestFirst.slice().reverse(), // newest first for display
       },
       // Legacy fields (existing dashboard still reads these)
       recent,
