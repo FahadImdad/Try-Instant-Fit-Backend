@@ -7,9 +7,6 @@ import { isolateGarment } from '@/lib/gemini';
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-// Scan & Wear standardised on Flash 3.1 — same model used for customer try-ons.
-const ISOLATION_MODEL = 'gemini-3.1-flash-image-preview';
-
 // 90s — Gemini isolation can take ~10-30s
 export const maxDuration = 90;
 
@@ -143,7 +140,7 @@ export async function POST(request: NextRequest) {
     async function isolateBufferAndStore(buf: Buffer, mimeType: string): Promise<void> {
       const cleanProductId = product_id!.trim();
       const productBase64 = buf.toString('base64');
-      const isolated = await isolateGarment(productBase64, mimeType, ISOLATION_MODEL);
+      const isolated = await isolateGarment(productBase64, mimeType);
       const isolatedBuf = Buffer.from(isolated.data, 'base64');
       isolatedGarmentUrl = await uploadIsolatedGarment(isolatedBuf, cleanProductId, isolated.mimeType);
 

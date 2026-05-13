@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { uploadProductImage, uploadIsolatedGarment } from '@/lib/storage';
-import { isolateGarment } from '@/lib/gemini';
+import { isolateGarment, TRYON_MODEL } from '@/lib/gemini';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -11,7 +11,6 @@ const CORS = {
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const ISOLATION_MODEL = 'gemini-3.1-flash-image-preview';
 
 export const maxDuration = 90;
 
@@ -126,7 +125,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // Pre-process garment for AI try-on (best-effort)
       try {
         const productBase64 = buf.toString('base64');
-        const isolated = await isolateGarment(productBase64, imageFile.type, ISOLATION_MODEL);
+        const isolated = await isolateGarment(productBase64, imageFile.type);
         const isolatedBuf = Buffer.from(isolated.data, 'base64');
         isolatedUrl = await uploadIsolatedGarment(isolatedBuf, sku.trim(), isolated.mimeType);
 
@@ -187,7 +186,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         product_id: sku.trim(),
         product_name: `[Setup] ${name.trim()}`,
         result_image_url: isolatedUrl,
-        ai_model: ISOLATION_MODEL,
+        ai_model: TRYON_MODEL,
         cost_usd: 0.045,
         source: 'ghost-layer',
         product_uuid: product?.id ?? null,

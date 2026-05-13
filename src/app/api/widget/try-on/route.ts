@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { geminiTryOn, TRYON_MODEL_FALLBACK } from '@/lib/gemini';
+import { geminiTryOn, TRYON_MODEL } from '@/lib/gemini';
 import { uploadTryOnResult } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 
@@ -8,6 +8,9 @@ export const maxDuration = 60;
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+// Locked Gemini cost per single try-on call (gemini-3.1-flash-image-preview @ 512px).
+const TRYON_COST_USD = 0.045;
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -20,11 +23,10 @@ export async function POST(request: NextRequest) {
     const brandId         = formData.get('brand_id')          as string | null;
     const productId       = formData.get('product_id')        as string | null;
     const productName     = formData.get('product_name')      as string | null;
-    const outputResolution   = formData.get('output_resolution')  as string | null;
-    // Default 512 (fastest + cheapest). Caller can override per-request.
-    const maxDim = outputResolution ? parseInt(outputResolution, 10) : 512;
-    // Model is locked to TRYON_MODEL_FALLBACK (gemini-3.1-flash-image-preview);
-    // any `gemini_model` form field from the client is ignored on purpose.
+    // Model + output resolution are LOCKED server-side:
+    // - model: gemini-3.1-flash-image-preview
+    // - max dim: 512
+    // Any `output_resolution` or `gemini_model` form fields are ignored.
 
     // ── Scan & Wear context (optional) ──────────────────────────────────────
     const sourceParam = (formData.get('source') as string | null)?.trim() || 'ghost-layer';
@@ -121,20 +123,17 @@ export async function POST(request: NextRequest) {
       }, { status: 502 });
     }
 
-    console.log(`[try-on] Using cached isolated garment at ${maxDim}px (product=${productId})`);
+    console.log(`[try-on] Using cached isolated garment (product=${productId})`);
 
     const geminiResult = await geminiTryOn(
       userPhotoBase64,
       userPhotoFile.type,
       garment,
-      TRYON_MODEL_FALLBACK,  // locked — do not accept overrides from the client
-      maxDim
     );
     const resultBase64 = geminiResult.data;
     const resultMimeType = geminiResult.mimeType;
-    const usedGeminiModel = geminiResult.model;
 
-    const aiModel = usedGeminiModel ?? TRYON_MODEL_FALLBACK;
+    const aiModel = TRYON_MODEL;
     console.log('[try-on] Done.');
 
     // ── Upload result to Google Cloud Storage ───────────────────────────────
@@ -145,7 +144,7 @@ export async function POST(request: NextRequest) {
 
     // ── Save to Supabase ────────────────────────────────────────────────────
     // For Scan & Wear we need the inserted row's id to link in qr_scans, so we await.
-    // Cost is single-call (isolation happens upstream at upload time).
+    // Cost is fixed (locked model + size, single call).
     const tryonInsert = await supabase
       .from('tryons')
       .insert({
@@ -155,15 +154,7 @@ export async function POST(request: NextRequest) {
         result_image_url:   resultUrl,
         ai_model:           aiModel,
         processing_time_ms: processingTimeMs,
-        cost_usd:           (() => {
-          const m = usedGeminiModel ?? '';
-          const r = maxDim; // 512 | 1024 | 2048 | 4096
-          return m.includes('pro')
-            ? (r <= 2048 ? 0.134 : 0.24)
-            : m.includes('2.5-flash')
-              ? (r <= 512 ? 0.022 : r <= 1024 ? 0.034 : r <= 2048 ? 0.050 : 0.076)
-              : (r <= 512 ? 0.045 : r <= 1024 ? 0.067 : r <= 2048 ? 0.101 : 0.151);
-        })(),
+        cost_usd:           TRYON_COST_USD,
         source,
       })
       .select('id')
