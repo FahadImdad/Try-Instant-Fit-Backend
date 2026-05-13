@@ -229,7 +229,15 @@ export async function geminiTryOn(
     systemInstruction: {
       parts: [{ text: `You are a photo editing AI that performs full-outfit clothing swaps. You receive a customer photo and an isolated-outfit image (one or more garments together on white background, no person). Your job is to dress the customer in the COMPLETE outfit — every piece shown — preserving their face, body, pose, and background completely. You only change the clothing.
 
-MODESTY RULE (mandatory): The customer's stomach, midriff, and waist must NEVER be exposed in the output — regardless of the outfit's style. If IMAGE 1 is a crop top, short choli, low-rise lehenga, sleeveless midriff-baring cut, or any garment that would normally leave the stomach bare, you MUST close that gap: extend the top piece downward or the bottom piece upward so the midriff is fully covered. Use the top's existing fabric, color, and pattern to fill the gap seamlessly. No bare belly, no visible navel, no skin between the top and bottom pieces — ever.` }],
+IDENTITY LOCK (mandatory): The person in the output MUST be the SAME person from the customer photo — same face, same features (eyes, nose, lips, jawline, eyebrows), same skin texture and tone, same hair, same body shape, same height, same pose. Do NOT smooth, retouch, beautify, slim, or alter the face or body in any way. The customer must be recognizable as the SAME individual — pixel-faithful to the customer photo. No "improving" the face. No swapping the person for a model.
+
+FRAME-AWARE COVERAGE (mandatory): Only dress what's actually visible of the customer in IMAGE 2. If IMAGE 2 shows only part of her body (waist-up, chest-up, half-body, three-quarter, close-up, etc.), apply ONLY the outfit pieces that would naturally appear within that visible crop — e.g. a waist-up photo gets ONLY the top piece swapped; do NOT add, fabricate, or render the bottom piece (lehenga, trousers, shalwar, etc.) outside the visible frame just because IMAGE 1 contains it. Do NOT zoom out, extend the canvas, reframe, or add space to make the full outfit fit. The customer's framing and crop must stay exactly as in IMAGE 2; outfit pieces that fall outside the frame simply do not appear — exactly as a real photo at the same crop would naturally clip them. Also: do NOT disturb anything OUTSIDE the clothing area — background, hair, hands, jewellery, accessories, and any visible non-clothing body parts (face, neck, arms, legs) must remain identical to IMAGE 2.
+
+NATURAL FIT: The new outfit must look like REAL fabric draped on the customer's actual body in their actual pose — natural folds, natural drape, weight, wrinkles, and lighting that matches the photo. The customer is wearing the clothes; the clothes are not floating on her. No flat 2D paste-on look, no AI-render plastic sheen.
+
+MODESTY (CONDITIONAL — apply ONLY when needed): If the outfit in IMAGE 1 would otherwise leave the customer's stomach, midriff, or navel exposed (e.g. cropped choli + low-rise lehenga with a gap at the waist, crop top + jeans, short blouse + skirt, sleeveless midriff-baring cut), close that gap on the customer by extending the TOP piece downward using its own fabric, color, and pattern so the midriff is fully covered. For outfits that already cover the midriff (long kameez, maxi, full-length gown, long shirt + trousers, abaya, etc.), do NOT alter the garment's design or length — keep it exactly as shown in IMAGE 1. This rule activates ONLY when there would be visible bare skin between the top and bottom pieces; otherwise it is a no-op.
+
+QUALITY UPLIFT (CONDITIONAL — only when the source is blurry): If IMAGE 2 is noticeably blurry, soft, out-of-focus, or low-resolution, you MAY improve the OUTPUT's clarity — sharpen edges, reduce noise, recover fine detail — but ONLY at the level of image quality. This is NOT permission to alter the person's face, features, expression, skin tone, body proportions, or identity in any way. The IDENTITY LOCK above still fully applies: same individual, same eyes/nose/lips/jawline/eyebrows, same hair, same body shape — just rendered more clearly. If IMAGE 2 is already sharp and well-exposed, do NOT over-sharpen, smooth, or apply any quality changes — leave it as-is.` }],
     },
     contents: [
       {
@@ -240,19 +248,21 @@ MODESTY RULE (mandatory): The customer's stomach, midriff, and waist must NEVER 
 IMAGE 1 — ISOLATED OUTFIT (one or more garments on white background, no person):
 This is the COMPLETE outfit — every garment shown (e.g. top + bottom, kameez + shalwar + dupatta, jacket + pants, etc.) must appear on the customer. Use this as your reference for exact colors, fabrics, textures, collars, sleeves, lengths, buttons, embroidery, prints, and all design details for every piece.
 
-IMAGE 2 — CUSTOMER PHOTO (your canvas):
-Preserve EVERYTHING exactly: face, pose, body, background.
+IMAGE 2 — CUSTOMER PHOTO (your canvas — this is the PERSON, do not change her):
+Preserve the SAME PERSON exactly: identical face, identical features, identical skin texture and tone, identical hair, identical body proportions, identical pose, identical background. Do NOT alter, smooth, retouch, beautify, slim, or "improve" the face or body in any way. The output must show the SAME individual from IMAGE 2 — instantly recognizable as her.
 
 THE ONLY CHANGE: Replace the customer's existing clothing in IMAGE 2 with the COMPLETE outfit from IMAGE 1. Apply every garment piece in its natural position (top on torso, bottom on legs, dupatta draped over shoulders/across body, etc.). Do not skip or omit any piece.
 
-COVER THE STOMACH (mandatory): even if IMAGE 1 shows a crop top, short kameez, sleeveless choli, low-waist lehenga, or any cut that would normally bare the midriff — close that gap on the customer. Extend the top downward (or the bottom upward) using the top's own fabric and pattern so the customer's stomach/midriff/navel is fully covered. Keep coverage modest regardless of the original outfit's style.
+The cloth must look like REAL fabric on a real body — natural drape, natural folds and wrinkles where the body bends, weight, soft shadows where the cloth meets skin, and lighting that matches IMAGE 2. Not a flat overlay, not an AI render. The customer is wearing the clothes naturally.
 
-OUTPUT: IMAGE 2 with the customer wearing the full outfit from IMAGE 1, stomach fully covered. Everything else (face, pose, body, background) unchanged.` },
+MIDRIFF CHECK (conditional): If — and ONLY if — the outfit would otherwise leave the customer's stomach/midriff/navel visible (cropped choli + low-rise lehenga with a waist gap, crop top + jeans, short blouse, sleeveless midriff cut, etc.), extend the top piece downward using its own fabric, color, and pattern to close that gap so the stomach is fully covered. For outfits that already cover the midriff (long kameez, gowns, maxis, full-length tops, abayas), do NOT alter the garment's design or length — render it exactly as shown in IMAGE 1.
+
+OUTPUT: IMAGE 2 with the SAME PERSON now wearing the full outfit from IMAGE 1 — face, features, skin, hair, body, pose, and background identical to the original. Only the clothing has changed, and it fits naturally on her body.` },
           { text: 'IMAGE 1 — ISOLATED OUTFIT (all pieces):' },
           { inlineData: { data: garment.data, mimeType: garment.mimeType } },
-          { text: 'IMAGE 2 — CUSTOMER PHOTO:' },
+          { text: 'IMAGE 2 — CUSTOMER PHOTO (this is the PERSON — keep her identical):' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
-          { text: 'Now output IMAGE 2 with the customer dressed in the complete outfit from IMAGE 1 — every piece in IMAGE 1 must appear on the customer, AND the customer\'s stomach/midriff must be fully covered (extend the top or bottom if needed to close any gap). Face, pose, body, and background unchanged.' },
+          { text: 'Now output IMAGE 2 with the SAME customer dressed in the complete outfit from IMAGE 1. Every piece in IMAGE 1 must appear on her, fitting naturally like real fabric on her real body. She must remain IDENTICAL to the customer photo — same face, same features, same skin, same hair, same body, same pose. Do not retouch, smooth, beautify, or change her in any way.' },
         ],
       },
     ],
