@@ -72,6 +72,14 @@ CREATE TABLE IF NOT EXISTS analytics_events (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ── FX Rates (USD-based, refreshed daily by cron) ────────────────────────────
+CREATE TABLE IF NOT EXISTS fx_rates (
+  currency    TEXT PRIMARY KEY,
+  rate        NUMERIC(12, 4) NOT NULL,
+  source      TEXT NOT NULL DEFAULT 'open.er-api.com',
+  fetched_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ── Product Garments (AI cache) ─────────────────────────────────────────────
 -- Cache of pre-processed (background-removed) garment images, keyed by brand+product.
 -- product_garments.brand_id is TEXT (legacy) and holds UUID-format strings; not FK-enforced.
