@@ -245,7 +245,8 @@ export async function GET(
       cost_usd: r.cost_usd,
       source: r.source,
       created_at: r.created_at,
-      ai_model: r.ai_model,
+      // ai_model intentionally NOT exposed — the AI model/provider is secret
+      // and must never reach the client (dashboard doesn't use it anyway).
     }));
 
     return NextResponse.json({

@@ -9,7 +9,8 @@ export const maxDuration = 60;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-// Locked Gemini cost per single try-on call (gemini-3.1-flash-image-preview @ 512px).
+// Locked cost per single try-on call (one AI call @ 512px). The AI engine is
+// proprietary and intentionally not named anywhere in the codebase.
 const TRYON_COST_USD = 0.045;
 
 export async function POST(request: NextRequest) {
@@ -23,10 +24,9 @@ export async function POST(request: NextRequest) {
     const brandId         = formData.get('brand_id')          as string | null;
     const productId       = formData.get('product_id')        as string | null;
     const productName     = formData.get('product_name')      as string | null;
-    // Model + output resolution are LOCKED server-side:
-    // - model: gemini-3.1-flash-image-preview
-    // - max dim: 512
-    // Any `output_resolution` or `gemini_model` form fields are ignored.
+    // Model + output resolution are LOCKED server-side (max dim 512). Any
+    // model/provider/resolution fields sent by the client are ignored — the
+    // AI engine is never selectable from, or exposed to, the client.
 
     // ── Scan & Wear context (optional) ──────────────────────────────────────
     const sourceParam = (formData.get('source') as string | null)?.trim() || 'ghost-layer';
@@ -247,20 +247,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // NOTE: never return the AI model/provider to the client — it's secret.
     return NextResponse.json({
       result_url:         resultUrl,
       processing_time_ms: processingTimeMs,
-      model:              aiModel,
     });
 
   } catch (error) {
     const processingTimeMs = Date.now() - startTime;
     const msg = error instanceof Error ? error.message : String(error);
+    // Log the raw error server-side only. Do NOT echo it to the client — the
+    // underlying AI provider/model is secret and raw errors can leak it.
     console.error('[try-on] Unhandled error:', msg, error);
     return NextResponse.json(
       {
         error: 'Something went wrong generating your try-on. Please try again.',
-        debug: msg,
         processing_time_ms: processingTimeMs,
       },
       { status: 500 }

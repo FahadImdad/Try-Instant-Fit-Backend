@@ -53,7 +53,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
  * Create a new product. Accepts multipart/form-data with optional image upload.
  *
  * Fields: sku, name, price, currency, description, image (file)
- * If image uploaded → isolates garment via Gemini and caches to GCS for later try-ons.
+ * If image uploaded → isolates the garment via the AI engine and caches it for later try-ons.
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {

@@ -7,7 +7,7 @@ import { isolateGarment } from '@/lib/gemini';
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-// 90s — Gemini isolation can take ~10-30s
+// 90s — AI garment isolation can take ~10-30s
 export const maxDuration = 90;
 
 /**
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
       // Only re-run AI isolation if the product doesn't already have an
       // isolated garment cached. The products POST flow already pays for
       // isolation once per product — re-running it here on every QR
-      // regeneration would double-charge the platform's Gemini bill.
+      // regeneration would double-charge the platform's AI bill.
       if (!garmentIsolated) {
         try {
           await isolateBufferAndStore(buf, imageFile.type);
