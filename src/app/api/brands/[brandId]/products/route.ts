@@ -14,6 +14,16 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export const maxDuration = 90;
 
+// Auto-generate a product SKU/code when the brand doesn't supply one.
+// The SKU doubles as the product_id used in storage paths, QR links, and the
+// garment cache, so it must be unique and URL-safe. Format: TIF-XXXXXXXX
+// (timestamp + random, base36, uppercase) — readable and collision-resistant.
+function generateSku(): string {
+  const ts = Date.now().toString(36);
+  const rand = Math.random().toString(36).slice(2, 6);
+  return `TIF-${(ts + rand).toUpperCase()}`;
+}
+
 interface RouteParams {
   params: Promise<{ brandId: string }>;
 }
@@ -70,9 +80,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       sku?: string; name?: string; price?: number | null; currency?: string; description?: string;
     };
 
-    if (!sku?.trim() || !name?.trim()) {
-      return NextResponse.json({ error: 'sku and name are required' }, { status: 400, headers: CORS });
+    // Name is required; SKU/code is auto-generated when the brand doesn't
+    // provide one (the dashboard no longer asks for it). A supplied SKU is
+    // still honored so brands with existing codes can pass their own.
+    if (!name?.trim()) {
+      return NextResponse.json({ error: 'name is required' }, { status: 400, headers: CORS });
     }
+    const resolvedSku = sku?.trim() || generateSku();
     if (price !== null && price !== undefined && (typeof price !== 'number' || price < 0)) {
       return NextResponse.json({ error: 'price must be a non-negative number' }, { status: 400, headers: CORS });
     }
@@ -120,18 +134,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Image must be under 10MB' }, { status: 400, headers: CORS });
       }
       const buf = Buffer.from(await imageFile.arrayBuffer());
-      imageUrl = await uploadProductImage(buf, brandId, sku.trim(), imageFile.type);
+      imageUrl = await uploadProductImage(buf, brandId, resolvedSku, imageFile.type);
 
       // Pre-process garment for AI try-on (best-effort)
       try {
         const productBase64 = buf.toString('base64');
         const isolated = await isolateGarment(productBase64, imageFile.type);
         const isolatedBuf = Buffer.from(isolated.data, 'base64');
-        isolatedUrl = await uploadIsolatedGarment(isolatedBuf, sku.trim(), isolated.mimeType);
+        isolatedUrl = await uploadIsolatedGarment(isolatedBuf, resolvedSku, isolated.mimeType);
 
         // Also write into legacy product_garments cache so old try-on flow works
         await supabase.from('product_garments').upsert({
-          product_id: sku.trim(),
+          product_id: resolvedSku,
           brand_id: brandId,
           isolated_garment_url: isolatedUrl,
           mime_type: isolated.mimeType,
@@ -145,7 +159,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .from('products')
       .insert({
         brand_id: brandId,
-        sku: sku.trim(),
+        sku: resolvedSku,
         name: name.trim(),
         price: price ?? null,
         currency: currency || 'PKR',
@@ -183,7 +197,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // (source='ghost-layer' since we don't have a 'setup' source enum yet)
       await supabase.from('tryons').insert({
         brand_id: brandId,
-        product_id: sku.trim(),
+        product_id: resolvedSku,
         product_name: `[Setup] ${name.trim()}`,
         result_image_url: isolatedUrl,
         ai_model: TRYON_MODEL,
@@ -195,7 +209,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // Write credit_ledger row for deep analytics (uniform $0.125/credit)
       await supabase.from('credit_ledger').insert({
         brand_id: brandId,
-        product_id: sku.trim(),
+        product_id: resolvedSku,
         kind: 'process',
         amount: 1,
         cost_usd: Number(brand.price_per_tryon_usd) || 0.125,
