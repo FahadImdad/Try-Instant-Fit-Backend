@@ -75,19 +75,18 @@ export async function isolateGarment(
         role: 'user',
         parts: [
           {
-            text: `Turn this product photo into a flat-lay reference of the outfit on a pure white background. No model, no body, no pose.
+            text: `Look at this product photo and identify EVERY separate item shown. Count them. Whatever they are, and however many, every item you see MUST appear in your output. Dropping or merging an item is the main failure — do not do it.
 
-Include every garment piece, fully visible:
-- Top: flat, symmetrical, sleeves down.
-- Bottom: full width and full length, spread out.
-- Dupatta / scarf: fully unfolded and spread flat. Every detail visible.
-- Any other piece (jacket, vest, belt): include it.
+Produce the item(s) on a pure white background as if worn on an invisible person — natural 3D shape, volume, and drape, with no person, no body, no mannequin, no pose, and no background visible. The shapes should look filled out and worn, not flattened or laid out.
 
-Reproduce each piece EXACTLY as in the source: same colors, fabric, embroidery, prints, patterns, cut, length, hem, neckline, sleeves. Do not redesign, restyle, or alter anything.
+For EACH item you identified, fully visible, nothing overlapping or hidden:
+- show it with its natural worn shape, full size, and full extent
+- reproduce it EXACTLY as in the source: same colors, materials, textures, prints, patterns, details, and proportions
+- do NOT redesign, restyle, recolor, or simplify
 
-If the source shows bare midriff between the top and the bottom, place the top's hem TOUCHING the bottom's waistband on the canvas — zero white space between them. The pieces themselves stay unchanged; only their position changes. If the source already covers the midriff, lay them out with natural spacing.
+If two items are worn directly adjacent in the source (one ending where the next begins), keep them in that same adjacent position, touching at that join — no gap of empty background between them. The items themselves stay unchanged; only their arrangement is set by how they are worn. Otherwise, position them as they would naturally sit when worn together.
 
-Output: the outfit on white, flat-lay, every piece fully visible, faithful to the original.`,
+Before finishing, verify your output contains the SAME number of items you counted. If one is missing, add it. Output: every item, on white, on an invisible body, faithful to the original.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
