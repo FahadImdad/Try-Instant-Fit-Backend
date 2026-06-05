@@ -75,18 +75,20 @@ export async function isolateGarment(
         role: 'user',
         parts: [
           {
-            text: `Look at this product photo and identify EVERY separate item shown. Count them. Whatever they are, and however many, every item you see MUST appear in your output. Dropping or merging an item is the main failure — do not do it.
+            text: `Look at this product photo and identify every separate CLOTHING item shown. Count the clothing pieces. Clothing includes garments and worn fabric: tops, shirts, kurtas, dresses, bottoms, trousers, skirts, jackets, outerwear, and draped pieces like a dupatta, scarf, or shawl, and a belt if one is worn with the outfit. Every CLOTHING piece you see MUST appear in your output — dropping or merging a clothing piece is the main failure, do not do it.
 
-Produce the item(s) on a pure white background as if worn on an invisible person — natural 3D shape, volume, and drape, with no person, no body, no mannequin, no pose, and no background visible. The shapes should look filled out and worn, not flattened or laid out.
+EXCLUDE accessories and personal items entirely — they must NOT appear in the output at all: glasses and sunglasses, jewelry of any kind (necklaces, earrings, bracelets, rings), watches, bags and handbags, shoes and footwear, hats and headwear. If the source shows any of these, simply leave them out. Output only the clothing.
 
-For EACH item you identified, fully visible, nothing overlapping or hidden:
+Produce the clothing on a pure white background as if worn on an invisible person — natural 3D shape, volume, and drape, with no person, no body, no mannequin, no pose, and no background visible. The shapes should look filled out and worn, not flattened or laid out.
+
+For EACH clothing piece, fully visible, nothing overlapping or hidden:
 - show it with its natural worn shape, full size, and full extent
 - reproduce it EXACTLY as in the source: same colors, materials, textures, prints, patterns, details, and proportions
 - do NOT redesign, restyle, recolor, or simplify
 
-If two items are worn directly adjacent in the source (one ending where the next begins), keep them in that same adjacent position, touching at that join — no gap of empty background between them. The items themselves stay unchanged; only their arrangement is set by how they are worn. Otherwise, position them as they would naturally sit when worn together.
+If two clothing pieces are worn directly adjacent in the source (one ending where the next begins), keep them in that same adjacent position, touching at that join — no gap of empty background between them. The pieces themselves stay unchanged; only their arrangement is set by how they are worn. Otherwise, position them as they would naturally sit when worn together.
 
-Before finishing, verify your output contains the SAME number of items you counted. If one is missing, add it. Output: every item, on white, on an invisible body, faithful to the original.`,
+Before finishing, verify your output contains the SAME number of clothing pieces you counted, and that NO glasses, jewelry, watch, bag, shoe, or hat appears. If a clothing piece is missing, add it; if an accessory slipped in, remove it. Output: every clothing piece, no accessories, on white, on an invisible body, faithful to the original.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
