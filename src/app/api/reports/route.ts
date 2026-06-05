@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
     let message: string | undefined;
     let screenshot_url: string | undefined;
     let result_url: string | undefined;
+    let user_photo_url_in: string | undefined;  // original photo passed as a URL (vendor JSON path)
     let brand_id: string | undefined;
     let tryon_id: string | undefined;
     let product_id: string | undefined;
@@ -75,6 +76,9 @@ export async function POST(request: NextRequest) {
     } else {
       const body = await request.json().catch(() => ({}));
       ({ type, source, rating, reason, message, screenshot_url, result_url, brand_id, tryon_id, product_id, qr_id } = body);
+      // Vendor reports pass the original product photo as a URL (no file upload),
+      // so the admin queue can show it in the "before" slot beside the result.
+      user_photo_url_in = body.user_photo_url;
     }
 
     if (!type || !VALID_TYPES.includes(type as ReportType)) {
@@ -124,6 +128,10 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.error('[reports] User photo upload failed:', e);
       }
+    } else if (user_photo_url_in?.trim()) {
+      // No file, but a URL was provided (vendor flow) — use it directly as the
+      // "before" image so the admin queue renders the same side-by-side view.
+      userPhotoUrl = user_photo_url_in.trim();
     }
 
     const { data, error } = await supabase
