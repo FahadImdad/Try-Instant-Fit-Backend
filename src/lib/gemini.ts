@@ -121,7 +121,9 @@ export async function geminiTryOn(
 
 Use IMAGE 1 only for the garment's design, color, and fabric. Do not copy the model, pose, or background from IMAGE 1.
 
-Fit the garment naturally to her real body and pose, like real fabric. Only dress what is visible in IMAGE 2's frame — don't reframe or extend the photo.` }],
+Render the garment as if this exact person were really wearing it in this exact pose. Picture how the real fabric would behave on her body right now and draw that: it follows her posture, bends where she bends, and obeys gravity and motion. If she is mid-jump or moving, the loose parts (skirt, dupatta, sleeves) lift, flow, and trail with that motion; if she is standing or sitting, they hang and fold naturally. Show realistic folds, drape, and weight — never stiff, flat, floating, or pasted-on.
+
+Only dress what is visible in IMAGE 2's frame, in each piece's natural position on her body. Pieces that fall outside the frame simply don't appear. Don't reframe, extend the photo, or add fabric to fill the canvas.` }],
     },
     contents: [
       {
@@ -131,7 +133,7 @@ Fit the garment naturally to her real body and pose, like real fabric. Only dres
           { inlineData: { data: garment.data, mimeType: garment.mimeType } },
           { text: 'IMAGE 2 — the customer (keep her exactly as she is, change only her clothing):' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
-          { text: 'Now dress this customer in the garment from IMAGE 1, fitted naturally to her real body and pose. Keep her face, hair, body, hands, pose, and background unchanged.' },
+          { text: 'Now dress this customer in the garment from IMAGE 1. Render it the way this real fabric would actually look on her body in her exact current pose — following her posture and motion, with natural drape, folds, and weight. Keep her face, hair, body, hands, pose, and background unchanged.' },
         ],
       },
     ],
