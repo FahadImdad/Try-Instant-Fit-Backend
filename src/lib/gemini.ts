@@ -125,6 +125,8 @@ Render the garment as if this exact person were really wearing it in this exact 
 
 Keep each piece's true length and proportions from IMAGE 1. A long dress, gown, maxi skirt, kurta, or lehenga stays full-length down to its real hemline; long sleeves stay long. Never shorten, crop short, or turn a long garment into a short one to make it fit. If a long piece would naturally reach below what's visible, let it continue past the bottom edge of the frame rather than ending it early on her body.
 
+Keep the result modest: the customer's stomach, midriff, navel, cleavage, and back must stay covered. If the garment design would leave the midriff bare (e.g. a short choli above a low skirt), close that gap so no bare stomach shows — extend the top down or raise the skirt/dupatta to cover the waist, keeping the same fabric, color, and embroidery. Never expose more skin than a fully clothed, modestly dressed person would show. Keep the garment's design faithful, but coverage takes priority over copying a revealing cut.
+
 Only dress what is visible in IMAGE 2's frame, in each piece's natural position on her body. Pieces that fall outside the frame simply continue off-edge or don't appear — but a piece that IS on her keeps its real length. Don't reframe, extend the photo, or add fabric to fill the canvas.` }],
     },
     contents: [
@@ -135,7 +137,7 @@ Only dress what is visible in IMAGE 2's frame, in each piece's natural position 
           { inlineData: { data: garment.data, mimeType: garment.mimeType } },
           { text: 'IMAGE 2 — the customer (keep her exactly as she is, change only her clothing):' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
-          { text: 'Now dress this customer in the garment from IMAGE 1. Render it the way this real fabric would actually look on her body in her exact current pose — following her posture and motion, with natural drape, folds, and weight. Keep the garment at its true full length (a long dress or skirt stays long, flowing to its real hemline — never shortened). Keep her face, hair, body, hands, pose, and background unchanged.' },
+          { text: 'Now dress this customer in the garment from IMAGE 1. Render it the way this real fabric would actually look on her body in her exact current pose — following her posture and motion, with natural drape, folds, and weight. Keep the garment at its true full length (a long dress or skirt stays long, flowing to its real hemline — never shortened). Keep it modest — stomach, midriff, and chest stay covered, with no bare skin between the top and the skirt. Keep her face, hair, body, hands, pose, and background unchanged.' },
         ],
       },
     ],
