@@ -123,7 +123,9 @@ Use IMAGE 1 only for the garment's design, color, and fabric. Do not copy the mo
 
 Render the garment as if this exact person were really wearing it in this exact pose. Picture how the real fabric would behave on her body right now and draw that: it follows her posture, bends where she bends, and obeys gravity and motion. If she is mid-jump or moving, the loose parts (skirt, dupatta, sleeves) lift, flow, and trail with that motion; if she is standing or sitting, they hang and fold naturally. Show realistic folds, drape, and weight — never stiff, flat, floating, or pasted-on.
 
-Only dress what is visible in IMAGE 2's frame, in each piece's natural position on her body. Pieces that fall outside the frame simply don't appear. Don't reframe, extend the photo, or add fabric to fill the canvas.` }],
+Keep each piece's true length and proportions from IMAGE 1. A long dress, gown, maxi skirt, kurta, or lehenga stays full-length down to its real hemline; long sleeves stay long. Never shorten, crop short, or turn a long garment into a short one to make it fit. If a long piece would naturally reach below what's visible, let it continue past the bottom edge of the frame rather than ending it early on her body.
+
+Only dress what is visible in IMAGE 2's frame, in each piece's natural position on her body. Pieces that fall outside the frame simply continue off-edge or don't appear — but a piece that IS on her keeps its real length. Don't reframe, extend the photo, or add fabric to fill the canvas.` }],
     },
     contents: [
       {
@@ -133,7 +135,7 @@ Only dress what is visible in IMAGE 2's frame, in each piece's natural position 
           { inlineData: { data: garment.data, mimeType: garment.mimeType } },
           { text: 'IMAGE 2 — the customer (keep her exactly as she is, change only her clothing):' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
-          { text: 'Now dress this customer in the garment from IMAGE 1. Render it the way this real fabric would actually look on her body in her exact current pose — following her posture and motion, with natural drape, folds, and weight. Keep her face, hair, body, hands, pose, and background unchanged.' },
+          { text: 'Now dress this customer in the garment from IMAGE 1. Render it the way this real fabric would actually look on her body in her exact current pose — following her posture and motion, with natural drape, folds, and weight. Keep the garment at its true full length (a long dress or skirt stays long, flowing to its real hemline — never shortened). Keep her face, hair, body, hands, pose, and background unchanged.' },
         ],
       },
     ],
