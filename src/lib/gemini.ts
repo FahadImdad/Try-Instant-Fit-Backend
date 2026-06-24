@@ -75,13 +75,9 @@ export async function isolateGarment(
         role: 'user',
         parts: [
           {
-            text: `Show only the clothing from this photo on a plain white background, as if worn on an invisible person — natural shape and drape, no person, body, mannequin, or background.
+            text: `Show this complete outfit on a plain white background, as if worn together on one invisible person — natural worn shape and drape, no body, mannequin, pose, or background.
 
-Include every clothing piece (tops, bottoms, dresses, dupattas, scarves, jackets, a worn belt). Leave out all accessories: glasses, jewelry, watches, bags, shoes, hats.
-
-Arrange the pieces as one complete outfit on a single invisible body, exactly as they sit when actually worn — as if one person is wearing the whole outfit at once. A top, choli, or shirt must sit directly on the waistband of the skirt or trousers below it, overlapping or touching at the waist with NO gap between them. Never float the top above the bottom with empty white space in between. The only background visible is around the outside of the whole outfit, never a band of white separating the top from the bottom.
-
-Keep each piece exactly as in the photo — same colors, fabric, patterns, and details.`,
+Keep every clothing piece (top, bottom, dress, dupatta, scarf, jacket), each exactly as in the photo — same colors, fabric, patterns, and details. Pieces worn together sit in their normal worn positions, the top resting on the skirt or trousers with no empty gap between them. Leave out all accessories (jewelry, watch, bag, shoes, glasses, hat).`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
@@ -117,17 +113,9 @@ export async function geminiTryOn(
   // Step 2: Apply isolated outfit to customer photo
   const result = await callGemini({
     systemInstruction: {
-      parts: [{ text: `You edit IMAGE 2, a photo of a customer. Change only her clothing — dress her in the garment from IMAGE 1. Keep everything else in IMAGE 2 exactly as it is: her face, hair, skin, body, hands, pose, background, and lighting.
+      parts: [{ text: `Edit IMAGE 2 (the customer): change only her clothing into the garment from IMAGE 1, and keep everything else exactly as it is — her face, hair, skin, body, hands, pose, background, and lighting. Use IMAGE 1 only for the garment's design, color, and fabric; ignore its model, pose, and background.
 
-Use IMAGE 1 only for the garment's design, color, and fabric. Do not copy the model, pose, or background from IMAGE 1.
-
-Render the garment as if this exact person were really wearing it in this exact pose. Picture how the real fabric would behave on her body right now and draw that: it follows her posture, bends where she bends, and obeys gravity and motion. If she is mid-jump or moving, the loose parts (skirt, dupatta, sleeves) lift, flow, and trail with that motion; if she is standing or sitting, they hang and fold naturally. Show realistic folds, drape, and weight — never stiff, flat, floating, or pasted-on.
-
-Keep each piece's true length and proportions from IMAGE 1. A long dress, gown, maxi skirt, kurta, or lehenga stays full-length down to its real hemline; long sleeves stay long. Never shorten, crop short, or turn a long garment into a short one to make it fit. If a long piece would naturally reach below what's visible, let it continue past the bottom edge of the frame rather than ending it early on her body.
-
-Keep the result modest: the customer's stomach, midriff, navel, cleavage, and back must stay covered. If the garment design would leave the midriff bare (e.g. a short choli above a low skirt), close that gap so no bare stomach shows — extend the top down or raise the skirt/dupatta to cover the waist, keeping the same fabric, color, and embroidery. Never expose more skin than a fully clothed, modestly dressed person would show. Keep the garment's design faithful, but coverage takes priority over copying a revealing cut.
-
-Only dress what is visible in IMAGE 2's frame, in each piece's natural position on her body. Pieces that fall outside the frame simply continue off-edge or don't appear — but a piece that IS on her keeps its real length. Don't reframe, extend the photo, or add fabric to fill the canvas.` }],
+Make it look like she is really wearing the outfit, not a flat cutout pasted on: real fabric that drapes, folds, and catches her photo's light, moving with her pose. Keep each piece its true length from IMAGE 1 (long stays long, flowing past the frame if needed; never shortened). Keep it modest — her stomach, midriff, and chest stay covered, with no bare gap between the top and the skirt.` }],
     },
     contents: [
       {
@@ -137,7 +125,7 @@ Only dress what is visible in IMAGE 2's frame, in each piece's natural position 
           { inlineData: { data: garment.data, mimeType: garment.mimeType } },
           { text: 'IMAGE 2 — the customer (keep her exactly as she is, change only her clothing):' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
-          { text: 'Now dress this customer in the garment from IMAGE 1. Render it the way this real fabric would actually look on her body in her exact current pose — following her posture and motion, with natural drape, folds, and weight. Keep the garment at its true full length (a long dress or skirt stays long, flowing to its real hemline — never shortened). Keep it modest — stomach, midriff, and chest stay covered, with no bare skin between the top and the skirt. Keep her face, hair, body, hands, pose, and background unchanged.' },
+          { text: 'Now show this same customer really wearing the garment from IMAGE 1 — full length, modest, fitted naturally to her real body and pose. Keep her face, hair, body, hands, pose, and background unchanged.' },
         ],
       },
     ],
