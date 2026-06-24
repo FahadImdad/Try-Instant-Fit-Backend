@@ -115,7 +115,9 @@ export async function geminiTryOn(
     systemInstruction: {
       parts: [{ text: `Edit IMAGE 2 (the customer): change only her clothing into the garment from IMAGE 1, and keep everything else exactly as it is — her face, hair, skin, body, hands, pose, background, and lighting. Use IMAGE 1 only for the garment's design, color, and fabric; ignore its model, pose, and background.
 
-Make it look like she is really wearing the outfit, not a flat cutout pasted on: real fabric that drapes, folds, and catches her photo's light, moving with her pose. Keep each piece its true length from IMAGE 1 (long stays long, flowing past the frame if needed; never shortened). Keep it modest — her stomach, midriff, and chest stay covered, with no bare gap between the top and the skirt.` }],
+Make it look like she is really wearing the outfit, not a flat cutout pasted on: real fabric that drapes, folds, and catches her photo's light, moving with her pose. Keep each piece its true length from IMAGE 1 (long stays long, flowing past the frame if needed; never shortened).
+
+Modesty is required: no bare stomach, midriff, navel, waist, cleavage, or back may show in the result. If the top in IMAGE 1 is a short or cropped cut that would leave the waist bare, lengthen it in the same fabric and embroidery so it reaches and meets the skirt's waistband — the top and skirt connect with skin fully covered all the way around. Her torso from chest to hips is always covered by fabric. This overrides faithfulness to a revealing cut.` }],
     },
     contents: [
       {
@@ -125,7 +127,7 @@ Make it look like she is really wearing the outfit, not a flat cutout pasted on:
           { inlineData: { data: garment.data, mimeType: garment.mimeType } },
           { text: 'IMAGE 2 — the customer (keep her exactly as she is, change only her clothing):' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
-          { text: 'Now show this same customer really wearing the garment from IMAGE 1 — full length, modest, fitted naturally to her real body and pose. Keep her face, hair, body, hands, pose, and background unchanged.' },
+          { text: 'Now show this same customer really wearing the garment from IMAGE 1 — full length, fitted naturally to her real body and pose, with her waist and midriff fully covered (no bare stomach; if the top is cropped, lengthen it to meet the skirt). Keep her face, hair, body, hands, pose, and background unchanged.' },
         ],
       },
     ],
