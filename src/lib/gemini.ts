@@ -79,7 +79,7 @@ export async function isolateGarment(
 
 Include every clothing piece (tops, bottoms, dresses, dupattas, scarves, jackets, a worn belt). Leave out all accessories: glasses, jewelry, watches, bags, shoes, hats.
 
-Arrange the pieces as one connected outfit, exactly as they sit when worn together — a top resting on the skirt or trousers it's worn with, touching where they meet. Do not leave empty white space or gaps between pieces that are worn against each other.
+Arrange the pieces as one complete outfit on a single invisible body, exactly as they sit when actually worn — as if one person is wearing the whole outfit at once. A top, choli, or shirt must sit directly on the waistband of the skirt or trousers below it, overlapping or touching at the waist with NO gap between them. Never float the top above the bottom with empty white space in between. The only background visible is around the outside of the whole outfit, never a band of white separating the top from the bottom.
 
 Keep each piece exactly as in the photo — same colors, fabric, patterns, and details.`,
           },
