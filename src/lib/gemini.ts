@@ -79,6 +79,8 @@ export async function isolateGarment(
 
 Include every clothing piece (tops, bottoms, dresses, dupattas, scarves, jackets, a worn belt). Leave out all accessories: glasses, jewelry, watches, bags, shoes, hats.
 
+Arrange the pieces as one connected outfit, exactly as they sit when worn together — a top resting on the skirt or trousers it's worn with, touching where they meet. Do not leave empty white space or gaps between pieces that are worn against each other.
+
 Keep each piece exactly as in the photo — same colors, fabric, patterns, and details.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
