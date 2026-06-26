@@ -77,7 +77,7 @@ export async function isolateGarment(
           {
             text: `Show this complete outfit on a plain white background, as if worn together on one invisible person — natural worn shape and drape, no body, mannequin, pose, or background.
 
-Keep every clothing piece (top, bottom, dress, dupatta, scarf, jacket), each exactly as in the photo — same colors, fabric, patterns, and details. Pieces worn together sit in their normal worn positions, the top resting on the skirt or trousers with no empty gap between them. Leave out all accessories (jewelry, watch, bag, shoes, glasses, hat).`,
+Keep the dress design EXACTLY the same as the photo — this is critical. Reproduce every piece (top, bottom, dress, dupatta, scarf, jacket) with full fidelity: its exact colors, fabric, embroidery, prints, patterns, motifs, borders, neckline, and cut. Do NOT redesign, recolor, restyle, simplify, embellish, or change any detail of the garment. Pieces worn together sit in their normal worn positions, the top resting on the skirt or trousers with no empty gap between them. Leave out all accessories (jewelry, watch, bag, shoes, glasses, hat).`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
