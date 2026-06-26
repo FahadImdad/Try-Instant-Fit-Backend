@@ -75,9 +75,11 @@ export async function isolateGarment(
         role: 'user',
         parts: [
           {
-            text: `Show this complete look by itself on a plain white background, as if worn on an invisible person — same design exactly. Include EVERYTHING the person is wearing: every clothing piece (coat/sherwani, kurta/shirt, trousers/churidar, dupatta or stole) plus headwear (cap/turban/safa), footwear (shoes/khussa), jewelry (mala/necklace), belt, and any other worn item. Keep each piece in its natural worn position, and do not drop or merge any item.
+            text: `Show this look by itself on a plain white background, as if worn on an invisible person.
 
-Show NO human body parts at all — no face, head, hair, neck, skin, hands, arms, legs, or feet anywhere in the image. The items hold their natural worn shape on an empty invisible person: the cap with nothing inside it, the shoes empty with no feet, the mala resting where the neck would be but with no neck shown. Only the items on a plain white background, nothing of a person.`,
+Only reproduce items that are ACTUALLY VISIBLE in the photo — exactly as they appear. Do NOT invent, add, or generate anything that is not in the photo: if there is no turban/cap, do not add one; if there are no shoes shown, do not add shoes; add no jewelry, belt, or piece that isn't already there. Keep every item that IS in the photo (clothing, and any headwear, footwear, jewelry, or belt the person is actually wearing), each in its natural worn position and unchanged in design, color, and detail. Do not drop or merge any item that is present.
+
+Show NO human body parts at all — no face, head, hair, neck, skin, hands, arms, legs, or feet. The items hold their natural worn shape on an empty invisible person. Only the items on a plain white background, nothing of a person.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
