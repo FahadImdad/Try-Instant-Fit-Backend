@@ -75,7 +75,7 @@ export async function isolateGarment(
         role: 'user',
         parts: [
           {
-            text: `Show this outfit by itself on a plain white background, as if worn on an invisible person — same design exactly, no body, mannequin, or accessories.`,
+            text: `Show this complete outfit by itself on a plain white background, as if worn on an invisible person — same design exactly, no body, mannequin, or accessories. Include every clothing piece the model is wearing (such as the coat/sherwani, kurta/shirt, trousers/churidar, and any dupatta or stole) — do not drop or merge any piece.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
