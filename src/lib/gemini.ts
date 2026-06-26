@@ -115,7 +115,9 @@ export async function geminiTryOn(
   // Step 2: Apply isolated outfit to customer photo
   const result = await callGemini({
     systemInstruction: {
-      parts: [{ text: `Put the outfit from IMAGE 1 onto the customer in IMAGE 2. Keep her face, hair, body, pose, and background exactly as they are — only change her clothing. Keep the outfit's design the same as IMAGE 1, and make it look naturally worn on her body in her pose, covering her modestly.` }],
+      parts: [{ text: `Put the outfit from IMAGE 1 onto the customer in IMAGE 2. IMAGE 1 is only a flat reference for the outfit's design, color, and fabric — it may show the outfit with no person inside, but ignore that; do NOT copy any emptiness or hollowness from it.
+
+The customer in IMAGE 2 is a real person and must stay fully visible and intact: keep their face, head, hair, neck, hands, arms, legs, feet, body, pose, and background exactly as they are. The person is wearing the outfit — there is always a real body filling the clothes, never a hollow or empty outfit. Only change their clothing into the outfit from IMAGE 1, keeping its design the same and making it look naturally worn on their body in their pose, covering them modestly.` }],
     },
     contents: [
       {
@@ -125,7 +127,7 @@ export async function geminiTryOn(
           { inlineData: { data: garment.data, mimeType: garment.mimeType } },
           { text: 'IMAGE 2 — the customer:' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
-          { text: 'Now show this customer wearing the outfit from IMAGE 1, naturally fitted to her body and pose and covering her modestly. Keep her face, hair, body, pose, and background unchanged.' },
+          { text: 'Now show this same customer, fully visible as a real person, wearing the outfit from IMAGE 1 — naturally fitted to their body and pose, covering them modestly, with no hollow or empty parts. Keep their face, head, hair, hands, feet, body, pose, and background unchanged.' },
         ],
       },
     ],
