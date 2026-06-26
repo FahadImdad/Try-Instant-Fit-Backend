@@ -111,9 +111,7 @@ export async function geminiTryOn(
   // Step 2: Apply isolated outfit to customer photo
   const result = await callGemini({
     systemInstruction: {
-      parts: [{ text: `Put the outfit from IMAGE 1 onto the customer in IMAGE 2. Keep her face, hair, body, pose, and background exactly as they are — only change her clothing. Keep the outfit's design the same as IMAGE 1, and make it look naturally worn on her body in her pose.
-
-Modesty is required: no bare stomach, midriff, navel, waist, cleavage, or back may show. If the top in IMAGE 1 is a short or cropped cut that would leave the waist bare, lengthen it in the same fabric and embroidery so it reaches and meets the skirt's waistband — the top and skirt connect with skin fully covered all the way around. Her torso from chest to hips is always covered by fabric.` }],
+      parts: [{ text: `Put the outfit from IMAGE 1 onto the customer in IMAGE 2. Keep her face, hair, body, pose, and background exactly as they are — only change her clothing. Keep the outfit's design the same as IMAGE 1, and make it look naturally worn on her body in her pose, covering her modestly.` }],
     },
     contents: [
       {
@@ -123,7 +121,7 @@ Modesty is required: no bare stomach, midriff, navel, waist, cleavage, or back m
           { inlineData: { data: garment.data, mimeType: garment.mimeType } },
           { text: 'IMAGE 2 — the customer:' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
-          { text: 'Now show this customer wearing the outfit from IMAGE 1, naturally fitted to her body and pose, with her waist and midriff fully covered (no bare stomach — if the top is cropped, lengthen it to meet the skirt). Keep her face, hair, body, pose, and background unchanged.' },
+          { text: 'Now show this customer wearing the outfit from IMAGE 1, naturally fitted to her body and pose and covering her modestly. Keep her face, hair, body, pose, and background unchanged.' },
         ],
       },
     ],
