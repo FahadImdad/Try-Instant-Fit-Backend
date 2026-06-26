@@ -75,9 +75,7 @@ export async function isolateGarment(
         role: 'user',
         parts: [
           {
-            text: `Show this complete outfit on a plain white background, as if worn together on one invisible person — natural worn shape and drape, no body, mannequin, pose, or background.
-
-Keep the dress design EXACTLY the same as the photo — this is critical. Reproduce every piece (top, bottom, dress, dupatta, scarf, jacket) with full fidelity: its exact colors, fabric, embroidery, prints, patterns, motifs, borders, neckline, and cut. Do NOT redesign, recolor, restyle, simplify, embellish, or change any detail of the garment. Pieces worn together sit in their normal worn positions, the top resting on the skirt or trousers with no empty gap between them. Leave out all accessories (jewelry, watch, bag, shoes, glasses, hat).`,
+            text: `Show this outfit by itself on a plain white background, as if worn on an invisible person — same design exactly, no body, mannequin, or accessories.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
@@ -113,23 +111,17 @@ export async function geminiTryOn(
   // Step 2: Apply isolated outfit to customer photo
   const result = await callGemini({
     systemInstruction: {
-      parts: [{ text: `Edit IMAGE 2 (the customer): change only her clothing into the garment from IMAGE 1, and keep everything else exactly as it is — her face, hair, skin, body, hands, pose, background, and lighting. Use IMAGE 1 only for the garment's design, color, and fabric; ignore its model, pose, and background.
-
-Keep the dress design EXACTLY the same as IMAGE 1 — this is critical. Reproduce its exact colors, fabric, embroidery, prints, patterns, motifs, borders, neckline, and cut with full fidelity. Do NOT redesign, recolor, restyle, simplify, embellish, or change any detail of the garment. The only adjustments allowed are fitting and draping it to her body in her pose, and the modesty coverage below — nothing else about the design changes.
-
-Make it look like she is really wearing the outfit, not a flat cutout pasted on: real fabric that drapes, folds, and catches her photo's light, moving with her pose. Re-drape the outfit onto HER body in THIS pose — do not keep the garment's original flat shape or the way it hung in IMAGE 1. Each piece attaches to her: sleeves follow her arms wherever they are, a dupatta rests on the shoulder/arm it would actually touch and falls from there, and a skirt swings, lifts, and sweeps to one side with her motion instead of fanning out flat and symmetrical. The fabric reacts to her limbs and movement, never floating beside her in empty space. Keep each piece its true length from IMAGE 1 (long stays long, flowing past the frame if needed; never shortened).
-
-Modesty is required: no bare stomach, midriff, navel, waist, cleavage, or back may show in the result. If the top in IMAGE 1 is a short or cropped cut that would leave the waist bare, lengthen it in the same fabric and embroidery so it reaches and meets the skirt's waistband — the top and skirt connect with skin fully covered all the way around. Her torso from chest to hips is always covered by fabric. This overrides faithfulness to a revealing cut.` }],
+      parts: [{ text: `Put the outfit from IMAGE 1 onto the customer in IMAGE 2. Keep her face, hair, body, pose, and background exactly as they are — only change her clothing. Keep the outfit's design the same as IMAGE 1, and make it look naturally worn on her body in her pose, covering her modestly.` }],
     },
     contents: [
       {
         role: 'user',
         parts: [
-          { text: 'IMAGE 1 — the garment to put on her (use only its design, color, and fabric):' },
+          { text: 'IMAGE 1 — the outfit:' },
           { inlineData: { data: garment.data, mimeType: garment.mimeType } },
-          { text: 'IMAGE 2 — the customer (keep her exactly as she is, change only her clothing):' },
+          { text: 'IMAGE 2 — the customer:' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
-          { text: 'Now show this same customer really wearing the garment from IMAGE 1 — full length, fitted naturally to her real body and pose, with her waist and midriff fully covered (no bare stomach; if the top is cropped, lengthen it to meet the skirt). Keep her face, hair, body, hands, pose, and background unchanged.' },
+          { text: 'Now show this customer wearing the outfit from IMAGE 1, naturally fitted to her body and pose and covering her modestly. Keep her face, hair, body, pose, and background unchanged.' },
         ],
       },
     ],
