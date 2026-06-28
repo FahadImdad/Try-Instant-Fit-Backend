@@ -89,14 +89,18 @@ export async function uploadBrandLogo(
   const bucketName = process.env.GOOGLE_CLOUD_BUCKET_NAME;
   if (!bucketName) throw new Error('GOOGLE_CLOUD_BUCKET_NAME is required');
   const ext = mimeType === 'image/svg+xml' ? 'svg' : mimeType === 'image/webp' ? 'webp' : mimeType === 'image/jpeg' ? 'jpg' : 'png';
-  const fileName = `brands/${brandId}/logo.${ext}`;
+  // Unique path per upload (see uniqueSuffix note above). A fixed `logo.ext`
+  // path means every re-upload is an OVERWRITE, which fails in fine-grained-ACL
+  // buckets where the service account lacks storage.objects.delete — the exact
+  // bug behind "Failed to update profile" when a brand changes its logo.
+  const fileName = `brands/${brandId}/logo-${uniqueSuffix()}.${ext}`;
   const bucket = getStorage().bucket(bucketName);
   await bucket.file(fileName).save(imageBuffer, {
     contentType: mimeType,
     metadata: { cacheControl: 'public, max-age=31536000' },
     public: true,
   });
-  return `https://storage.googleapis.com/${bucketName}/${fileName}?v=${Date.now()}`;
+  return `https://storage.googleapis.com/${bucketName}/${fileName}`;
 }
 
 export async function uploadPaymentScreenshot(

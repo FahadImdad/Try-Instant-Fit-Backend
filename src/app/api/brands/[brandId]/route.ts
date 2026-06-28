@@ -84,9 +84,20 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       if (logoFile.size > MAX_LOGO_SIZE) {
         return NextResponse.json({ error: 'Logo must be under 5MB' }, { status: 400, headers: CORS });
       }
-      const buf = Buffer.from(await logoFile.arrayBuffer());
-      const newLogoUrl = await uploadBrandLogo(buf, brandId, logoFile.type);
-      update.logo_url = newLogoUrl;
+      // Isolate storage failures: a logo-upload error must not sink the whole
+      // profile save (text fields would otherwise be lost too). Report it as its
+      // own clear, human-safe message instead of the generic "Failed to update
+      // profile" the outer catch would produce.
+      try {
+        const buf = Buffer.from(await logoFile.arrayBuffer());
+        update.logo_url = await uploadBrandLogo(buf, brandId, logoFile.type);
+      } catch (logoErr) {
+        console.error('[brands PATCH] logo upload failed', logoErr);
+        return NextResponse.json(
+          { error: "We couldn't upload that logo. Your other changes weren't saved — please try again, or save without changing the logo." },
+          { status: 502, headers: CORS }
+        );
+      }
     }
 
     if (Object.keys(update).length === 0) {
