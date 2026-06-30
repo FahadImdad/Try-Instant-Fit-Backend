@@ -22,8 +22,13 @@ export async function POST(request: NextRequest) {
     const userPhotoFile   = formData.get('user_photo')        as File | null;
     const productImageUrl = formData.get('product_image_url') as string | null;
     const brandId         = formData.get('brand_id')          as string | null;
-    const productId       = formData.get('product_id')        as string | null;
-    const productName     = formData.get('product_name')      as string | null;
+    let   productId       = formData.get('product_id')        as string | null;
+    let   productName     = formData.get('product_name')      as string | null;
+    // Catalog browse path: the scan page can hand off by product_uuid (the
+    // products.id PK) when a shopper tries on an item from the "More from
+    // {Brand}" grid. We resolve its SKU (= product_garments.product_id) and
+    // name below, so the rest of the flow is identical to the QR path.
+    const productUuid     = formData.get('product_uuid')      as string | null;
     // Model + output resolution are LOCKED server-side (max dim 512). Any
     // model/provider/resolution fields sent by the client are ignored — the
     // AI engine is never selectable from, or exposed to, the client.
@@ -37,8 +42,35 @@ export async function POST(request: NextRequest) {
 
     // ── Validation ──────────────────────────────────────────────────────────
     if (!userPhotoFile)   return NextResponse.json({ error: 'user_photo is required' },        { status: 400 });
-    if (!productImageUrl) return NextResponse.json({ error: 'product_image_url is required' }, { status: 400 });
     if (!brandId)         return NextResponse.json({ error: 'brand_id is required' },          { status: 400 });
+
+    // ── Resolve product from product_uuid (catalog browse handoff) ─────────
+    // When the scan page hands off a catalog item by its products.id, fill in
+    // the SKU + name from that row so the cached-garment lookup below (which
+    // keys on the SKU) works exactly as it does for the QR flow. product_id
+    // and product_name from the form win if already supplied.
+    if (productUuid && (!productId || !productName)) {
+      const { data: prod } = await supabase
+        .from('products')
+        .select('sku, name, brand_id, active, show_in_catalog')
+        .eq('id', productUuid)
+        .maybeSingle();
+      if (!prod || prod.brand_id !== brandId) {
+        return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+      }
+      // Only catalog-visible products are try-on-able via this public path.
+      if (prod.active === false || prod.show_in_catalog === false) {
+        return NextResponse.json({ error: 'This product is not available to try on.' }, { status: 403 });
+      }
+      productId   = productId   || prod.sku;
+      productName = productName || prod.name;
+    }
+
+    // product_image_url is only used as a fallback display ref and isn't
+    // required once we have a product_id (the garment is loaded from cache).
+    if (!productImageUrl && !productId) {
+      return NextResponse.json({ error: 'product_image_url is required' }, { status: 400 });
+    }
     if (!ALLOWED_TYPES.includes(userPhotoFile.type)) {
       return NextResponse.json({ error: 'Photo must be JPG, PNG, or WebP' }, { status: 400 });
     }

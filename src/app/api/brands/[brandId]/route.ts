@@ -59,6 +59,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           }
         }
       }
+      // catalog_enabled is a boolean master switch — parse it from the
+      // checkbox-style string the form sends.
+      if (fd.has('catalog_enabled')) {
+        update.catalog_enabled = fd.get('catalog_enabled') === 'true' || fd.get('catalog_enabled') === '1';
+      }
       const f = fd.get('logo');
       if (f instanceof File && f.size > 0) logoFile = f;
     } else if (ct.includes('application/json')) {
@@ -68,6 +73,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           const v = body[k];
           update[k] = typeof v === 'string' ? (v.trim() || null) : v;
         }
+      }
+      if ('catalog_enabled' in body) {
+        update.catalog_enabled = !!body.catalog_enabled;
       }
     } else {
       return NextResponse.json(

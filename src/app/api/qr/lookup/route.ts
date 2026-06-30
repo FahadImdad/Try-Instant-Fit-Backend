@@ -36,11 +36,12 @@ export async function GET(request: NextRequest) {
       currency: string;
       description: string | null;
       image_url: string | null;
+      buy_url: string | null;
     } | null = null;
     if (qr.product_uuid) {
       const { data: p } = await supabase
         .from('products')
-        .select('name, sku, price, currency, description, image_url')
+        .select('name, sku, price, currency, description, buy_url, image_url')
         .eq('id', qr.product_uuid)
         .maybeSingle();
       if (p) product = p;
@@ -72,6 +73,7 @@ export async function GET(request: NextRequest) {
         product_price: product?.price ?? null,
         product_currency: product?.currency || null,
         product_description: product?.description || null,
+        product_buy_url: product?.buy_url || null,
         display_image_url: product?.image_url || qr.display_image_url,
         requires_passcode: qr.requires_passcode,
         remaining: qr.total_limit !== null ? Math.max(0, qr.total_limit - qr.total_used) : null,

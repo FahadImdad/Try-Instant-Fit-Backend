@@ -11,6 +11,23 @@ interface RouteParams {
   params: Promise<{ productId: string }>;
 }
 
+// Normalize a vendor "Buy Now" link to a clean http(s) URL (bare domains get
+// https:// added), or null when empty / unparseable / non-http. Mirrors the
+// helper in the products-create route so edits validate the same way.
+function normalizeBuyUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const v = raw.trim();
+  if (!v) return null;
+  const withProto = /^https?:\/\//i.test(v) ? v : `https://${v}`;
+  try {
+    const u = new URL(withProto);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * GET /api/products/[productId]
  * Single product detail.
@@ -40,9 +57,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { productId } = await params;
     const body = await request.json();
-    const allowed = ['name', 'sku', 'price', 'currency', 'description', 'active'];
+    const allowed = ['name', 'sku', 'price', 'currency', 'description', 'category', 'show_in_catalog', 'active'];
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const k of allowed) if (k in body) update[k] = body[k];
+    // buy_url is normalized (and validated to http/https) rather than copied
+    // verbatim. An explicit empty string clears the link.
+    if ('buy_url' in body) update.buy_url = normalizeBuyUrl(body.buy_url);
 
     const { data, error } = await supabase
       .from('products')

@@ -24,6 +24,24 @@ function generateSku(): string {
   return `TIF-${(ts + rand).toUpperCase()}`;
 }
 
+// Normalize a vendor-supplied "Buy Now" link. Returns a clean http(s) URL, or
+// null when empty / unparseable. Bare domains (shop.com/x) get https:// added.
+// Only http/https are allowed — blocks javascript:, data:, etc. for safety
+// since this URL is rendered as a link on the customer-facing scan page.
+export function normalizeBuyUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const v = raw.trim();
+  if (!v) return null;
+  const withProto = /^https?:\/\//i.test(v) ? v : `https://${v}`;
+  try {
+    const u = new URL(withProto);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 interface RouteParams {
   params: Promise<{ brandId: string }>;
 }
@@ -37,7 +55,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     const { brandId } = await params;
     const { data, error } = await supabase
       .from('products')
-      .select('id, sku, name, price, currency, description, image_url, isolated_garment_url, active, created_at')
+      .select('id, sku, name, price, currency, description, category, show_in_catalog, buy_url, image_url, isolated_garment_url, active, created_at')
       .eq('brand_id', brandId)
       .order('created_at', { ascending: false });
     if (error) throw error;
@@ -71,13 +89,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         price: fd.get('price') ? parseFloat(fd.get('price') as string) : null,
         currency: (fd.get('currency') as string) || 'PKR',
         description: fd.get('description'),
+        category: fd.get('category'),
+        buy_url: fd.get('buy_url'),
+        // Checkbox-style flag: a product is browsable in the public catalog
+        // unless the brand explicitly opts it out. Absent → default TRUE.
+        show_in_catalog: fd.has('show_in_catalog')
+          ? fd.get('show_in_catalog') === 'true' || fd.get('show_in_catalog') === '1'
+          : true,
       };
     } else {
       body = await request.json();
     }
 
-    const { sku, name, price, currency, description } = body as {
+    const { sku, name, price, currency, description, category, show_in_catalog, buy_url } = body as {
       sku?: string; name?: string; price?: number | null; currency?: string; description?: string;
+      category?: string | null; show_in_catalog?: boolean; buy_url?: string | null;
     };
 
     // Name is required; SKU/code is auto-generated when the brand doesn't
@@ -164,6 +190,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         price: price ?? null,
         currency: currency || 'PKR',
         description: description?.trim() || null,
+        category: category?.trim() || null,
+        // Default TRUE when the field isn't sent at all (e.g. older clients).
+        show_in_catalog: show_in_catalog !== false,
+        buy_url: normalizeBuyUrl(buy_url),
         image_url: imageUrl,
         isolated_garment_url: isolatedUrl,
       })
