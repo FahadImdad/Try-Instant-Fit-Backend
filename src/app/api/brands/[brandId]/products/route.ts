@@ -55,7 +55,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     const { brandId } = await params;
     const { data, error } = await supabase
       .from('products')
-      .select('id, sku, name, price, currency, description, category, show_in_catalog, buy_url, image_url, isolated_garment_url, active, created_at')
+      .select('id, sku, name, price, currency, description, category, category_group, audience, show_in_catalog, buy_url, image_url, isolated_garment_url, active, created_at')
       .eq('brand_id', brandId)
       .order('created_at', { ascending: false });
     if (error) throw error;
@@ -90,6 +90,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         currency: (fd.get('currency') as string) || 'PKR',
         description: fd.get('description'),
         category: fd.get('category'),
+        category_group: fd.get('category_group'),
+        audience: fd.get('audience'),
         buy_url: fd.get('buy_url'),
         // Checkbox-style flag: a product is browsable in the public catalog
         // unless the brand explicitly opts it out. Absent → default TRUE.
@@ -101,9 +103,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       body = await request.json();
     }
 
-    const { sku, name, price, currency, description, category, show_in_catalog, buy_url } = body as {
+    const { sku, name, price, currency, description, category, category_group, audience, show_in_catalog, buy_url } = body as {
       sku?: string; name?: string; price?: number | null; currency?: string; description?: string;
-      category?: string | null; show_in_catalog?: boolean; buy_url?: string | null;
+      category?: string | null; category_group?: string | null; audience?: string | null;
+      show_in_catalog?: boolean; buy_url?: string | null;
     };
 
     // Name is required; SKU/code is auto-generated when the brand doesn't
@@ -191,6 +194,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         currency: currency || 'PKR',
         description: description?.trim() || null,
         category: category?.trim() || null,
+        category_group: category_group?.trim() || null,
+        audience: audience?.trim() || null,
         // Default TRUE when the field isn't sent at all (e.g. older clients).
         show_in_catalog: show_in_catalog !== false,
         buy_url: normalizeBuyUrl(buy_url),

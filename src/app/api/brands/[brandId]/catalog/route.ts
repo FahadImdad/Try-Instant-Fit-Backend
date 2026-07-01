@@ -58,7 +58,7 @@ export async function GET(
     // so rows without one are skipped client-side-safe (filtered below).
     let query = supabase
       .from('products')
-      .select('id, sku, name, price, currency, description, category, buy_url, image_url, isolated_garment_url')
+      .select('id, sku, name, price, currency, description, category, category_group, audience, buy_url, image_url, isolated_garment_url')
       .eq('brand_id', brandId)
       .eq('active', true)
       .eq('show_in_catalog', true)
@@ -105,6 +105,8 @@ export async function GET(
         currency: p.currency || null,
         description: p.description || null,
         category: p.category || null,
+        category_group: p.category_group || null,
+        audience: p.audience || null,
         buy_url: p.buy_url || null,
         image_url: p.image_url || null,
         token: tokenByUuid.get(p.id) || null,

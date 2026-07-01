@@ -57,7 +57,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { productId } = await params;
     const body = await request.json();
-    const allowed = ['name', 'sku', 'price', 'currency', 'description', 'category', 'show_in_catalog', 'active'];
+    const allowed = ['name', 'sku', 'price', 'currency', 'description', 'category', 'category_group', 'audience', 'show_in_catalog', 'active'];
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const k of allowed) if (k in body) update[k] = body[k];
     // buy_url is normalized (and validated to http/https) rather than copied
