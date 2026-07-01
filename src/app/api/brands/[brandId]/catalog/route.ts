@@ -40,7 +40,7 @@ export async function GET(
     // Brand-level master switch. Also confirms the brand exists.
     const { data: brand } = await supabase
       .from('brands')
-      .select('id, name, catalog_enabled')
+      .select('id, name, catalog_enabled, logo_url, primary_color, website_url')
       .eq('id', brandId)
       .maybeSingle();
 
@@ -115,7 +115,13 @@ export async function GET(
     return NextResponse.json(
       {
         catalog_enabled: true,
-        brand: { id: brand.id, name: brand.name },
+        brand: {
+          id: brand.id,
+          name: brand.name,
+          logo_url: brand.logo_url ?? null,
+          primary_color: brand.primary_color ?? null,
+          website_url: brand.website_url ?? null,
+        },
         count: items.length,
         products: items,
       },
