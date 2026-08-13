@@ -72,6 +72,12 @@ export async function POST(request: NextRequest) {
     if (!brand_id) {
       return NextResponse.json({ error: 'brand_id is required' }, { status: 400, headers: QR_CORS });
     }
+    if (requires_passcode !== true && (!Number.isInteger(total_limit) || Number(total_limit) < 1)) {
+      return NextResponse.json(
+        { error: 'A positive try-on cap is required when passcode protection is off' },
+        { status: 400, headers: QR_CORS },
+      );
+    }
 
     // Resolve product info: either from product_uuid (new flow) or product_id+name (legacy)
     let product_id = productIdInput;

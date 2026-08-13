@@ -28,6 +28,11 @@ function normalizeBuyUrl(raw: unknown): string | null {
   }
 }
 
+function normalizeSizes(raw: unknown): string[] {
+  const values = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(',') : [];
+  return [...new Set(values.map(v => String(v).trim()).filter(Boolean))].slice(0, 30);
+}
+
 /**
  * GET /api/products/[productId]
  * Single product detail.
@@ -57,12 +62,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { productId } = await params;
     const body = await request.json();
-    const allowed = ['name', 'sku', 'price', 'currency', 'description', 'category', 'category_group', 'audience', 'show_in_catalog', 'active'];
+    const allowed = ['name', 'sku', 'price', 'currency', 'description', 'category', 'category_group', 'audience', 'show_in_catalog', 'active', 'custom_size_available'];
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const k of allowed) if (k in body) update[k] = body[k];
     // buy_url is normalized (and validated to http/https) rather than copied
     // verbatim. An explicit empty string clears the link.
     if ('buy_url' in body) update.buy_url = normalizeBuyUrl(body.buy_url);
+    if ('available_sizes' in body) update.available_sizes = normalizeSizes(body.available_sizes);
+    if ('custom_size_note' in body) update.custom_size_note = body.custom_size_available === false
+      ? null
+      : String(body.custom_size_note || '').trim().slice(0, 240) || null;
+    if (body.custom_size_available === false) update.custom_size_note = null;
 
     const { data, error } = await supabase
       .from('products')

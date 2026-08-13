@@ -11,6 +11,7 @@ const CORS = {
 
 const MAX_LOGO_SIZE = 5 * 1024 * 1024;
 const ALLOWED_LOGO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+const LEGAL_VERSION = '2026-08-13';
 
 /**
  * POST /api/brands/register
@@ -43,6 +44,8 @@ export async function POST(request: NextRequest) {
         contact_position: fd.get('contact_position'),
         country: fd.get('country') || 'PK',
         primary_color: fd.get('primary_color') || '#5a67f2',
+        accepted_terms: fd.get('accepted_terms') === 'true' || fd.get('accepted_terms') === '1' || fd.get('accepted_terms') === 'on',
+        accepted_privacy: fd.get('accepted_privacy') === 'true' || fd.get('accepted_privacy') === '1' || fd.get('accepted_privacy') === 'on',
       };
     } else {
       body = await request.json();
@@ -58,11 +61,14 @@ export async function POST(request: NextRequest) {
       contact_position,
       country,
       primary_color,
+      accepted_terms,
+      accepted_privacy,
     } = body as {
       google_id_token?: string;
       name?: string; email?: string; website_url?: string; contact_phone?: string;
       contact_name?: string; contact_position?: string;
       country?: string; primary_color?: string;
+      accepted_terms?: boolean; accepted_privacy?: boolean;
     };
 
     if (!name?.trim()) {
@@ -79,6 +85,12 @@ export async function POST(request: NextRequest) {
     }
     if (!country?.trim()) {
       return NextResponse.json({ error: 'Country is required' }, { status: 400, headers: CORS });
+    }
+    if (accepted_terms !== true || accepted_privacy !== true) {
+      return NextResponse.json(
+        { error: 'You must accept the Terms of Service and Privacy Policy to register' },
+        { status: 400, headers: CORS },
+      );
     }
 
     // ── Validation ─────────────────────────────────────────────────────────
@@ -168,6 +180,10 @@ export async function POST(request: NextRequest) {
         primary_color: primary_color || '#5a67f2',
         status: 'pending',
         tryon_credits: 0,
+        terms_accepted_at: new Date().toISOString(),
+        terms_version: LEGAL_VERSION,
+        privacy_accepted_at: new Date().toISOString(),
+        privacy_version: LEGAL_VERSION,
       })
       .select('*')
       .single();

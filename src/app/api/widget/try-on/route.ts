@@ -222,32 +222,21 @@ export async function POST(request: NextRequest) {
     // ── Scan & Wear: bump counters + log scan + link tryon to passcode ─────
     if (source === 'scan-wear' && qrId) {
       try {
-        // Increment qr_codes.total_used + grab product_uuid for the tryon link
+        // Atomically consume the successful QR/passcode use. The database
+        // also returns an exhausted open QR to passcode-required mode.
         const { data: qr } = await supabase
           .from('qr_codes')
-          .select('total_used, product_uuid')
+          .select('product_uuid')
           .eq('id', qrId)
           .single();
-        if (qr) {
-          await supabase
-            .from('qr_codes')
-            .update({ total_used: (qr.total_used || 0) + 1 })
-            .eq('id', qrId);
-        }
+        const { error: consumeError } = await supabase.rpc('consume_qr_tryon', {
+          p_qr_id: qrId,
+          p_passcode_id: passcodeId || null,
+        });
+        if (consumeError) throw consumeError;
 
         // Increment brand passcode used_count + link tryon to passcode/product
         if (passcodeId) {
-          const { data: pc } = await supabase
-            .from('brand_passcodes')
-            .select('used_count')
-            .eq('id', passcodeId)
-            .single();
-          if (pc) {
-            await supabase
-              .from('brand_passcodes')
-              .update({ used_count: (pc.used_count || 0) + 1 })
-              .eq('id', passcodeId);
-          }
           // Link the just-inserted tryon back to the passcode for sales reporting
           if (tryonId) {
             await supabase

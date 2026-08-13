@@ -37,11 +37,14 @@ export async function GET(request: NextRequest) {
       description: string | null;
       image_url: string | null;
       buy_url: string | null;
+      available_sizes: string[];
+      custom_size_available: boolean;
+      custom_size_note: string | null;
     } | null = null;
     if (qr.product_uuid) {
       const { data: p } = await supabase
         .from('products')
-        .select('name, sku, price, currency, description, buy_url, image_url')
+        .select('name, sku, price, currency, description, buy_url, image_url, available_sizes, custom_size_available, custom_size_note')
         .eq('id', qr.product_uuid)
         .maybeSingle();
       if (p) product = p;
@@ -51,8 +54,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'QR has expired' }, { status: 410, headers: QR_CORS });
     }
 
-    if (qr.total_limit !== null && qr.total_used >= qr.total_limit) {
-      return NextResponse.json({ error: 'QR has reached its try-on limit' }, { status: 410, headers: QR_CORS });
+    if (qr.total_limit !== null && qr.total_used >= qr.total_limit && !qr.requires_passcode) {
+      await supabase.from('qr_codes').update({ requires_passcode: true, updated_at: new Date().toISOString() }).eq('id', qr.id);
+      qr.requires_passcode = true;
     }
 
     // Fetch brand display info incl. logo
@@ -74,6 +78,9 @@ export async function GET(request: NextRequest) {
         product_currency: product?.currency || null,
         product_description: product?.description || null,
         product_buy_url: product?.buy_url || null,
+        available_sizes: product?.available_sizes ?? [],
+        custom_size_available: product?.custom_size_available === true,
+        custom_size_note: product?.custom_size_note || null,
         display_image_url: product?.image_url || qr.display_image_url,
         requires_passcode: qr.requires_passcode,
         remaining: qr.total_limit !== null ? Math.max(0, qr.total_limit - qr.total_used) : null,

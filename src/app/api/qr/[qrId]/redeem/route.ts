@@ -49,8 +49,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (qr.expires_at && new Date(qr.expires_at) < new Date()) {
       return NextResponse.json({ allowed: false, reason: 'qr_expired' }, { status: 410, headers: QR_CORS });
     }
-    if (qr.total_limit !== null && qr.total_used >= qr.total_limit) {
-      return NextResponse.json({ allowed: false, reason: 'qr_limit_reached' }, { status: 410, headers: QR_CORS });
+    if (!qr.requires_passcode && qr.total_limit !== null && qr.total_used >= qr.total_limit) {
+      await supabase.from('qr_codes').update({ requires_passcode: true, updated_at: new Date().toISOString() }).eq('id', qr.id);
+      return NextResponse.json({ allowed: false, reason: 'passcode_required' }, { status: 403, headers: QR_CORS });
     }
 
     // Passcode-gated flow — uses brand-wide brand_passcodes (any of the brand's passcodes works)
