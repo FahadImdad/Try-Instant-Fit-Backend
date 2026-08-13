@@ -55,6 +55,24 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const { qrId } = await params;
     const body = await request.json();
 
+    if (body.requires_passcode === false) {
+      const proposedLimit = body.total_limit;
+      if (!Number.isInteger(proposedLimit) || proposedLimit < 1) {
+        return NextResponse.json(
+          { error: 'A positive try-on cap is required when passcode protection is off' },
+          { status: 400, headers: QR_CORS },
+        );
+      }
+      const { data: current } = await supabase.from('qr_codes').select('total_used').eq('id', qrId).maybeSingle();
+      if (!current) return NextResponse.json({ error: 'QR not found' }, { status: 404, headers: QR_CORS });
+      if (proposedLimit <= (current.total_used || 0)) {
+        return NextResponse.json(
+          { error: 'The open try-on cap must be greater than the number already used' },
+          { status: 400, headers: QR_CORS },
+        );
+      }
+    }
+
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (typeof body.active === 'boolean') update.active = body.active;
     if (typeof body.requires_passcode === 'boolean') update.requires_passcode = body.requires_passcode;
