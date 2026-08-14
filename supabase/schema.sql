@@ -257,6 +257,22 @@ CREATE INDEX IF NOT EXISTS idx_credit_ledger_created_at  ON credit_ledger(create
 CREATE INDEX IF NOT EXISTS idx_credit_ledger_brand_kind  ON credit_ledger(brand_id, kind);
 CREATE INDEX IF NOT EXISTS idx_credit_ledger_report_id   ON credit_ledger(report_id);
 
+-- Customer emails collected during the scan-and-wear flow. Free/open try-ons
+-- require an email; passcode try-ons may provide one optionally.
+CREATE TABLE IF NOT EXISTS customer_tryon_leads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  qr_id UUID REFERENCES qr_codes(id) ON DELETE SET NULL,
+  tryon_id UUID REFERENCES tryons(id) ON DELETE SET NULL,
+  product_id TEXT,
+  customer_email TEXT NOT NULL,
+  access_mode TEXT NOT NULL CHECK (access_mode IN ('free', 'passcode')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT customer_tryon_leads_email_not_blank CHECK (length(trim(customer_email)) > 3)
+);
+CREATE INDEX IF NOT EXISTS idx_customer_tryon_leads_brand_created ON customer_tryon_leads(brand_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_customer_tryon_leads_email ON customer_tryon_leads(lower(customer_email));
+
 -- ── Brand credit summary view (per-brand breakdown ready for dashboard) ─────
 CREATE OR REPLACE VIEW brand_credit_summary AS
 SELECT
