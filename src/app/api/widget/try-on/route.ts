@@ -39,10 +39,18 @@ export async function POST(request: NextRequest) {
       sourceParam === 'scan-wear' || sourceParam === 'digital-mirror' ? sourceParam : 'ghost-layer';
     const qrId       = formData.get('qr_id')        as string | null;
     const passcodeId = formData.get('passcode_id')  as string | null;
+    const customerEmail = (formData.get('customer_email') as string | null)?.trim().toLowerCase() || '';
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail);
 
     // ── Validation ──────────────────────────────────────────────────────────
     if (!userPhotoFile)   return NextResponse.json({ error: 'user_photo is required' },        { status: 400 });
     if (!brandId)         return NextResponse.json({ error: 'brand_id is required' },          { status: 400 });
+    if (source === 'scan-wear' && !passcodeId && !emailValid) {
+      return NextResponse.json({ error: 'A valid email address is required for free try-ons', code: 'EMAIL_REQUIRED' }, { status: 400 });
+    }
+    if (customerEmail && !emailValid) {
+      return NextResponse.json({ error: 'Please enter a valid email address', code: 'EMAIL_INVALID' }, { status: 400 });
+    }
 
     // ── Resolve product from product_uuid (catalog browse handoff) ─────────
     // When the scan page hands off a catalog item by its products.id, fill in
@@ -266,6 +274,20 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.error('[try-on] Scan & Wear bookkeeping failed:', e instanceof Error ? e.message : String(e));
       }
+    }
+
+    // Save customer contact only after a successful try-on. Email is required
+    // for free/open access and optional when a valid passcode was used.
+    if (source === 'scan-wear' && customerEmail) {
+      const { error: leadError } = await supabase.from('customer_tryon_leads').insert({
+        brand_id: brandId,
+        qr_id: qrId || null,
+        tryon_id: tryonId,
+        product_id: productId,
+        customer_email: customerEmail,
+        access_mode: passcodeId ? 'passcode' : 'free',
+      });
+      if (leadError) console.error('[try-on] Failed to save customer lead:', leadError.message);
     }
 
     // NOTE: never return the AI model/provider to the client — it's secret.
