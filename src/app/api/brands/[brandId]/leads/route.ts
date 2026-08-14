@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '200', 10) || 200, 500);
     const { data, error } = await supabase
       .from('customer_tryon_leads')
-      .select('id, customer_email, access_mode, product_id, qr_id, tryon_id, created_at')
+      .select('id, customer_name, customer_email, customer_phone, followup_consent, access_mode, product_id, qr_id, tryon_id, created_at')
       .eq('brand_id', brandId)
       .order('created_at', { ascending: false })
       .limit(limit);

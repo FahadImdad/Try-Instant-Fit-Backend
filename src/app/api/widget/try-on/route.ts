@@ -40,6 +40,9 @@ export async function POST(request: NextRequest) {
     const qrId       = formData.get('qr_id')        as string | null;
     const passcodeId = formData.get('passcode_id')  as string | null;
     const customerEmail = (formData.get('customer_email') as string | null)?.trim().toLowerCase() || '';
+    const customerName = (formData.get('customer_name') as string | null)?.trim() || '';
+    const customerPhone = (formData.get('customer_phone') as string | null)?.trim() || '';
+    const followupConsent = formData.get('followup_consent') === 'true';
     const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail);
 
     // ── Validation ──────────────────────────────────────────────────────────
@@ -47,6 +50,12 @@ export async function POST(request: NextRequest) {
     if (!brandId)         return NextResponse.json({ error: 'brand_id is required' },          { status: 400 });
     if (source === 'scan-wear' && !passcodeId && !emailValid) {
       return NextResponse.json({ error: 'A valid email address is required for free try-ons', code: 'EMAIL_REQUIRED' }, { status: 400 });
+    }
+    if (source === 'scan-wear' && !passcodeId && customerName.length < 2) {
+      return NextResponse.json({ error: 'Your full name is required for free try-ons', code: 'NAME_REQUIRED' }, { status: 400 });
+    }
+    if (source === 'scan-wear' && !passcodeId && !followupConsent) {
+      return NextResponse.json({ error: 'Consent is required before starting a free try-on', code: 'CONSENT_REQUIRED' }, { status: 400 });
     }
     if (customerEmail && !emailValid) {
       return NextResponse.json({ error: 'Please enter a valid email address', code: 'EMAIL_INVALID' }, { status: 400 });
@@ -284,7 +293,10 @@ export async function POST(request: NextRequest) {
         qr_id: qrId || null,
         tryon_id: tryonId,
         product_id: productId,
+        customer_name: customerName || null,
         customer_email: customerEmail,
+        customer_phone: customerPhone || null,
+        followup_consent: followupConsent,
         access_mode: passcodeId ? 'passcode' : 'free',
       });
       if (leadError) console.error('[try-on] Failed to save customer lead:', leadError.message);
