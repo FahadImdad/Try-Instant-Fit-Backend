@@ -265,7 +265,10 @@ CREATE TABLE IF NOT EXISTS customer_tryon_leads (
   qr_id UUID REFERENCES qr_codes(id) ON DELETE SET NULL,
   tryon_id UUID REFERENCES tryons(id) ON DELETE SET NULL,
   product_id TEXT,
+  customer_name TEXT,
   customer_email TEXT NOT NULL,
+  customer_phone TEXT,
+  followup_consent BOOLEAN NOT NULL DEFAULT FALSE,
   access_mode TEXT NOT NULL CHECK (access_mode IN ('free', 'passcode')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT customer_tryon_leads_email_not_blank CHECK (length(trim(customer_email)) > 3)
