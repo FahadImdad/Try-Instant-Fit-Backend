@@ -54,6 +54,9 @@ export async function POST(request: NextRequest) {
     if (source === 'scan-wear' && !passcodeId && customerName.length < 2) {
       return NextResponse.json({ error: 'Your full name is required for free try-ons', code: 'NAME_REQUIRED' }, { status: 400 });
     }
+    if (source === 'scan-wear' && !passcodeId && customerPhone.replace(/\D/g, '').length < 7) {
+      return NextResponse.json({ error: 'A valid WhatsApp or phone number is required for free try-ons', code: 'PHONE_REQUIRED' }, { status: 400 });
+    }
     if (source === 'scan-wear' && !passcodeId && !followupConsent) {
       return NextResponse.json({ error: 'Consent is required before starting a free try-on', code: 'CONSENT_REQUIRED' }, { status: 400 });
     }
