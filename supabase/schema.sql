@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS widget_configs (
   button_color     TEXT NOT NULL DEFAULT '#1a1a2e',
   button_position  TEXT NOT NULL DEFAULT 'bottom-right'
                      CHECK (button_position IN ('top-right','bottom-right','top-left','bottom-left')),
+  show_platform_logo BOOLEAN NOT NULL DEFAULT TRUE,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (brand_id)
