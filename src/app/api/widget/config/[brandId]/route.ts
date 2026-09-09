@@ -6,6 +6,7 @@ const DEFAULT_CONFIG = {
   buttonText: 'Try It On ✨',
   buttonColor: '#1a1a2e',
   buttonPosition: 'bottom-right' as const,
+  showPlatformLogo: true,
 };
 
 export async function GET(
@@ -33,7 +34,7 @@ export async function GET(
     // Fetch widget config for this brand
     const { data: config } = await supabase
       .from('widget_configs')
-      .select('enabled, button_text, button_color, button_position')
+      .select('enabled, button_text, button_color, button_position, show_platform_logo')
       .eq('brand_id', brandId)
       .single();
 
@@ -43,6 +44,7 @@ export async function GET(
       buttonText: config?.button_text ?? DEFAULT_CONFIG.buttonText,
       buttonColor: config?.button_color ?? DEFAULT_CONFIG.buttonColor,
       buttonPosition: config?.button_position ?? DEFAULT_CONFIG.buttonPosition,
+      showPlatformLogo: config?.show_platform_logo ?? DEFAULT_CONFIG.showPlatformLogo,
       apiEndpoint: process.env.NEXT_PUBLIC_API_URL ?? 'https://api.tryinstantfit.com',
     });
   } catch (error) {
@@ -54,6 +56,19 @@ export async function GET(
       apiEndpoint: process.env.NEXT_PUBLIC_API_URL ?? 'https://api.tryinstantfit.com',
     });
   }
+}
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ brandId: string }> }) {
+  const { brandId } = await params;
+  const body = await request.json().catch(() => ({}));
+  const { data, error } = await supabase
+    .from('widget_configs')
+    .update({ show_platform_logo: body.showPlatformLogo !== false, updated_at: new Date().toISOString() })
+    .eq('brand_id', brandId)
+    .select('brand_id, show_platform_logo')
+    .single();
+  if (error) return NextResponse.json({ error: 'Could not update download branding' }, { status: 400 });
+  return NextResponse.json(data);
 }
 
 // Handle preflight
