@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     // event:
     //   • product_name LIKE '[Setup]%'  → product-image upload (kind='process')
     //   • otherwise                     → customer try-on       (kind='tryon')
-    const [{ data: brands, error: brandsError }, { data: tryonRows, error: tryonsError }] = await Promise.all([
+    const [{ data: brands, error: brandsError }, { data: tryonRows, error: tryonsError }, { data: brandingRows }] = await Promise.all([
       supabase
         .from('brands')
         .select('id, name, email, website_url, status, tryon_credits, tryon_credits_used, price_per_tryon_usd, unlimited, created_at')
@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
       supabase
         .from('tryons')
         .select('brand_id, product_name'),
+      supabase.from('widget_configs').select('brand_id, show_platform_logo'),
     ]);
 
     if (brandsError) throw brandsError;
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
       const c = countsByBrand.get(b.id);
       return {
         ...b,
+        show_platform_logo: brandingRows?.find((w) => w.brand_id === b.id)?.show_platform_logo !== false,
         tryon_count: c?.tryon_count ?? 0,
         process_count: c?.process_count ?? 0,
       };
