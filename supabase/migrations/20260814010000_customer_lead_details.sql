@@ -1,0 +1,4 @@
+ALTER TABLE customer_tryon_leads
+  ADD COLUMN IF NOT EXISTS customer_name TEXT,
+  ADD COLUMN IF NOT EXISTS customer_phone TEXT,
+  ADD COLUMN IF NOT EXISTS followup_consent BOOLEAN NOT NULL DEFAULT FALSE;

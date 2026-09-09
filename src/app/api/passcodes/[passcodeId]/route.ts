@@ -42,13 +42,13 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
 /**
  * PATCH /api/passcodes/[passcodeId]
- * Update code, active state, use_limit, expires_at, customer_label.
+ * Update metadata and/or add uses. Existing lifetime usage is never replaced.
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { passcodeId } = await params;
     const body = await request.json();
-    const allowed = ['code', 'active', 'use_limit', 'expires_at', 'customer_label'];
+    const allowed = ['code', 'active', 'expires_at', 'customer_label'];
     const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const k of allowed) if (k in body) update[k] = body[k];
 
@@ -61,6 +61,32 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         );
       }
       update.code = raw;
+    }
+
+    if ('use_limit' in body) {
+      return NextResponse.json(
+        { error: 'Use additional_uses to add try-ons; the lifetime limit cannot be replaced.' },
+        { status: 400, headers: CORS },
+      );
+    }
+
+    let incremented: unknown = null;
+    if ('additional_uses' in body) {
+      const additional = Number(body.additional_uses);
+      if (!Number.isInteger(additional) || additional < 1 || additional > 100000) {
+        return NextResponse.json({ error: 'Additional try-ons must be a whole number between 1 and 100000' }, { status: 400, headers: CORS });
+      }
+      const { data, error } = await supabase.rpc('add_passcode_uses', {
+        p_passcode_id: passcodeId,
+        p_additional_uses: additional,
+      });
+      if (error) throw error;
+      incremented = data;
+    }
+
+    const hasMetadataUpdate = Object.keys(update).length > 1;
+    if (!hasMetadataUpdate) {
+      return NextResponse.json({ passcode: incremented }, { status: 200, headers: CORS });
     }
 
     const { data, error } = await supabase

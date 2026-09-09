@@ -48,14 +48,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const { data, error } = await q;
     if (error) throw error;
 
+    const productIds = [...new Set((data ?? []).map(r => r.product_id).filter(Boolean))];
+    const nameBySku = new Map<string, string>();
+    if (productIds.length) {
+      const { data: products } = await supabase.from('products').select('sku, name').eq('brand_id', brandId).in('sku', productIds);
+      for (const product of products ?? []) nameBySku.set(product.sku, product.name);
+    }
+    const reports = (data ?? []).map(r => ({ ...r, product_name: r.product_id ? nameBySku.get(r.product_id) || null : null }));
+
     // Surface a quick summary so the dashboard can show a count badge
-    const counts = (data ?? []).reduce((acc: Record<string, number>, r: { status: string }) => {
+    const counts = reports.reduce((acc: Record<string, number>, r: { status: string }) => {
       acc[r.status] = (acc[r.status] || 0) + 1;
       return acc;
     }, {});
 
     return NextResponse.json(
-      { reports: data ?? [], counts },
+      { reports, counts },
       { status: 200, headers: CORS },
     );
   } catch (error) {

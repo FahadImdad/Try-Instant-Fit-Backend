@@ -24,6 +24,11 @@ function generateSku(): string {
   return `TIF-${(ts + rand).toUpperCase()}`;
 }
 
+function normalizeSizes(raw: unknown): string[] {
+  const values = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(',') : [];
+  return [...new Set(values.map(v => String(v).trim()).filter(Boolean))].slice(0, 30);
+}
+
 // Normalize a vendor-supplied "Buy Now" link. Returns a clean http(s) URL, or
 // null when empty / unparseable. Bare domains (shop.com/x) get https:// added.
 // Only http/https are allowed — blocks javascript:, data:, etc. for safety
@@ -55,7 +60,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     const { brandId } = await params;
     const { data, error } = await supabase
       .from('products')
-      .select('id, sku, name, price, currency, description, category, category_group, audience, show_in_catalog, buy_url, image_url, isolated_garment_url, active, created_at')
+      .select('id, sku, name, price, currency, description, category, category_group, audience, available_sizes, custom_size_available, custom_size_note, show_in_catalog, buy_url, image_url, isolated_garment_url, active, created_at')
       .eq('brand_id', brandId)
       .order('created_at', { ascending: false });
     if (error) throw error;
@@ -92,20 +97,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         category: fd.get('category'),
         category_group: fd.get('category_group'),
         audience: fd.get('audience'),
+        available_sizes: fd.get('available_sizes'),
+        custom_size_available: fd.get('custom_size_available') === 'true' || fd.get('custom_size_available') === '1',
+        custom_size_note: fd.get('custom_size_note'),
         buy_url: fd.get('buy_url'),
-        // Checkbox-style flag: a product is browsable in the public catalog
-        // unless the brand explicitly opts it out. Absent → default TRUE.
+        // Catalog publication is explicit. Absent means private.
         show_in_catalog: fd.has('show_in_catalog')
           ? fd.get('show_in_catalog') === 'true' || fd.get('show_in_catalog') === '1'
-          : true,
+          : false,
       };
     } else {
       body = await request.json();
     }
 
-    const { sku, name, price, currency, description, category, category_group, audience, show_in_catalog, buy_url } = body as {
+    const { sku, name, price, currency, description, category, category_group, audience, available_sizes, custom_size_available, custom_size_note, show_in_catalog, buy_url } = body as {
       sku?: string; name?: string; price?: number | null; currency?: string; description?: string;
       category?: string | null; category_group?: string | null; audience?: string | null;
+      available_sizes?: string[] | string; custom_size_available?: boolean; custom_size_note?: string | null;
       show_in_catalog?: boolean; buy_url?: string | null;
     };
 
@@ -196,8 +204,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         category: category?.trim() || null,
         category_group: category_group?.trim() || null,
         audience: audience?.trim() || null,
-        // Default TRUE when the field isn't sent at all (e.g. older clients).
-        show_in_catalog: show_in_catalog !== false,
+        available_sizes: normalizeSizes(available_sizes),
+        custom_size_available: custom_size_available === true,
+        custom_size_note: custom_size_available === true ? custom_size_note?.trim().slice(0, 240) || null : null,
+        show_in_catalog: show_in_catalog === true,
         buy_url: normalizeBuyUrl(buy_url),
         image_url: imageUrl,
         isolated_garment_url: isolatedUrl,

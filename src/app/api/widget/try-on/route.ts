@@ -39,10 +39,30 @@ export async function POST(request: NextRequest) {
       sourceParam === 'scan-wear' || sourceParam === 'digital-mirror' ? sourceParam : 'ghost-layer';
     const qrId       = formData.get('qr_id')        as string | null;
     const passcodeId = formData.get('passcode_id')  as string | null;
+    const customerEmail = (formData.get('customer_email') as string | null)?.trim().toLowerCase() || '';
+    const customerName = (formData.get('customer_name') as string | null)?.trim() || '';
+    const customerPhone = (formData.get('customer_phone') as string | null)?.trim() || '';
+    const followupConsent = formData.get('followup_consent') === 'true';
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail);
 
     // ── Validation ──────────────────────────────────────────────────────────
     if (!userPhotoFile)   return NextResponse.json({ error: 'user_photo is required' },        { status: 400 });
     if (!brandId)         return NextResponse.json({ error: 'brand_id is required' },          { status: 400 });
+    if (source === 'scan-wear' && !passcodeId && !emailValid) {
+      return NextResponse.json({ error: 'A valid email address is required for free try-ons', code: 'EMAIL_REQUIRED' }, { status: 400 });
+    }
+    if (source === 'scan-wear' && !passcodeId && customerName.length < 2) {
+      return NextResponse.json({ error: 'Your full name is required for free try-ons', code: 'NAME_REQUIRED' }, { status: 400 });
+    }
+    if (source === 'scan-wear' && !passcodeId && customerPhone.replace(/\D/g, '').length < 7) {
+      return NextResponse.json({ error: 'A valid WhatsApp or phone number is required for free try-ons', code: 'PHONE_REQUIRED' }, { status: 400 });
+    }
+    if (source === 'scan-wear' && !passcodeId && !followupConsent) {
+      return NextResponse.json({ error: 'Consent is required before starting a free try-on', code: 'CONSENT_REQUIRED' }, { status: 400 });
+    }
+    if (customerEmail && !emailValid) {
+      return NextResponse.json({ error: 'Please enter a valid email address', code: 'EMAIL_INVALID' }, { status: 400 });
+    }
 
     // ── Resolve product from product_uuid (catalog browse handoff) ─────────
     // When the scan page hands off a catalog item by its products.id, fill in
@@ -222,32 +242,21 @@ export async function POST(request: NextRequest) {
     // ── Scan & Wear: bump counters + log scan + link tryon to passcode ─────
     if (source === 'scan-wear' && qrId) {
       try {
-        // Increment qr_codes.total_used + grab product_uuid for the tryon link
+        // Atomically consume the successful QR/passcode use. The database
+        // also returns an exhausted open QR to passcode-required mode.
         const { data: qr } = await supabase
           .from('qr_codes')
-          .select('total_used, product_uuid')
+          .select('product_uuid')
           .eq('id', qrId)
           .single();
-        if (qr) {
-          await supabase
-            .from('qr_codes')
-            .update({ total_used: (qr.total_used || 0) + 1 })
-            .eq('id', qrId);
-        }
+        const { error: consumeError } = await supabase.rpc('consume_qr_tryon', {
+          p_qr_id: qrId,
+          p_passcode_id: passcodeId || null,
+        });
+        if (consumeError) throw consumeError;
 
         // Increment brand passcode used_count + link tryon to passcode/product
         if (passcodeId) {
-          const { data: pc } = await supabase
-            .from('brand_passcodes')
-            .select('used_count')
-            .eq('id', passcodeId)
-            .single();
-          if (pc) {
-            await supabase
-              .from('brand_passcodes')
-              .update({ used_count: (pc.used_count || 0) + 1 })
-              .eq('id', passcodeId);
-          }
           // Link the just-inserted tryon back to the passcode for sales reporting
           if (tryonId) {
             await supabase
@@ -277,6 +286,23 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.error('[try-on] Scan & Wear bookkeeping failed:', e instanceof Error ? e.message : String(e));
       }
+    }
+
+    // Save customer contact only after a successful try-on. Email is required
+    // for free/open access and optional when a valid passcode was used.
+    if (source === 'scan-wear' && customerEmail) {
+      const { error: leadError } = await supabase.from('customer_tryon_leads').insert({
+        brand_id: brandId,
+        qr_id: qrId || null,
+        tryon_id: tryonId,
+        product_id: productId,
+        customer_name: customerName || null,
+        customer_email: customerEmail,
+        customer_phone: customerPhone || null,
+        followup_consent: followupConsent,
+        access_mode: passcodeId ? 'passcode' : 'free',
+      });
+      if (leadError) console.error('[try-on] Failed to save customer lead:', leadError.message);
     }
 
     // NOTE: never return the AI model/provider to the client — it's secret.
