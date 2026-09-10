@@ -12,3 +12,10 @@ export async function POST(request: NextRequest) {
   await supabase.from('promotional_offer_brands').insert(brands.map((brand_id: string) => ({ offer_id: data.id, brand_id })));
   return NextResponse.json({ offer: data }, { status: 201, headers: ADMIN_CORS });
 }
+
+export async function GET(request: NextRequest) {
+  const unauthorized = requireAdminAuth(request); if (unauthorized) return unauthorized;
+  const { data, error } = await supabase.from('promotional_offers').select('*, promotional_offer_brands(brand_id)').order('created_at', { ascending: false });
+  if (error) return NextResponse.json({ error: 'Failed to load offers' }, { status: 500, headers: ADMIN_CORS });
+  return NextResponse.json({ offers: data ?? [] }, { headers: ADMIN_CORS });
+}
