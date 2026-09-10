@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS brands (
   -- Per-brand credit / quota system (added 2026-05)
   tryon_credits         INTEGER NOT NULL DEFAULT 0,
   tryon_credits_used    INTEGER NOT NULL DEFAULT 0,
-  price_per_tryon_usd   NUMERIC(8,4) NOT NULL DEFAULT 0.125,  -- 8 try-ons per $1 default
+  price_per_tryon_usd   NUMERIC(8,4) NOT NULL DEFAULT 0.25,  -- 4 try-ons per $1 default
   unlimited             BOOLEAN NOT NULL DEFAULT FALSE,        -- partner / demo brands
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
