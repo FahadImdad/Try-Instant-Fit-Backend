@@ -17,7 +17,13 @@ export async function GET(request: NextRequest) {
     // event:
     //   • product_name LIKE '[Setup]%'  → product-image upload (kind='process')
     //   • otherwise                     → customer try-on       (kind='tryon')
-    const [{ data: brands, error: brandsError }, { data: tryonRows, error: tryonsError }, { data: brandingRows }] = await Promise.all([
+    const [
+      { data: brands, error: brandsError },
+      { data: tryonRows, error: tryonsError },
+      { data: brandingRows },
+      { data: offerLinks },
+      { data: offers },
+    ] = await Promise.all([
       supabase
         .from('brands')
         .select('id, name, email, website_url, status, tryon_credits, tryon_credits_used, price_per_tryon_usd, unlimited, created_at')
@@ -26,6 +32,8 @@ export async function GET(request: NextRequest) {
         .from('tryons')
         .select('brand_id, product_name'),
       supabase.from('widget_configs').select('brand_id, show_platform_logo'),
+      supabase.from('promotional_offer_brands').select('brand_id, offer_id'),
+      supabase.from('promotional_offers').select('id, discount_percent, active').eq('active', true),
     ]);
 
     if (brandsError) throw brandsError;
@@ -39,11 +47,23 @@ export async function GET(request: NextRequest) {
       countsByBrand.set(r.brand_id, c);
     }
 
+    const activeDiscountByOffer = new Map(
+      (offers ?? []).map((offer) => [offer.id, Number(offer.discount_percent) || 0]),
+    );
+    const discountByBrand = new Map<string, number>();
+    for (const link of offerLinks ?? []) {
+      const discount = activeDiscountByOffer.get(link.offer_id) ?? 0;
+      if (discount > (discountByBrand.get(link.brand_id) ?? 0)) {
+        discountByBrand.set(link.brand_id, discount);
+      }
+    }
+
     const enriched = (brands ?? []).map((b) => {
       const c = countsByBrand.get(b.id);
       return {
         ...b,
         show_platform_logo: brandingRows?.find((w) => w.brand_id === b.id)?.show_platform_logo !== false,
+        active_promotional_discount: discountByBrand.get(b.id) ?? 0,
         tryon_count: c?.tryon_count ?? 0,
         process_count: c?.process_count ?? 0,
       };
