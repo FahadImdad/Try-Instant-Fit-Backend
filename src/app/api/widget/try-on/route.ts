@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { geminiTryOn, TRYON_MODEL } from '@/lib/gemini';
-import { uploadTryOnResult } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 
 // 60s timeout — single-call try-on, garment is pre-isolated at upload time.
@@ -189,8 +188,9 @@ export async function POST(request: NextRequest) {
     console.log('[try-on] Done.');
 
     // ── Upload result to Google Cloud Storage ───────────────────────────────
-    const resultBuffer = Buffer.from(resultBase64, 'base64');
-    const resultUrl = await uploadTryOnResult(resultBuffer, brandId, resultMimeType);
+    // Customer photos and generated images are ephemeral: return the result
+    // directly to this browser session and never upload it to cloud storage.
+    const resultUrl = `data:${resultMimeType};base64,${resultBase64}`;
 
     const processingTimeMs = Date.now() - startTime;
 
@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
         brand_id:           brandId,
         product_id:         productId,
         product_name:       productName,
-        result_image_url:   resultUrl,
+        result_image_url:   null,
         ai_model:           aiModel,
         processing_time_ms: processingTimeMs,
         cost_usd:           TRYON_COST_USD,

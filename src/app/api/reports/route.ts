@@ -14,6 +14,10 @@ const VALID_SOURCES = ['customer', 'brand'] as const;
 type ReportType   = typeof VALID_TYPES[number];
 type ReportSource = typeof VALID_SOURCES[number];
 
+function reportsEnabled(): boolean {
+  return false;
+}
+
 /**
  * POST /api/reports
  *
@@ -38,6 +42,16 @@ type ReportSource = typeof VALID_SOURCES[number];
  *   }
  */
 export async function POST(request: NextRequest) {
+  // Reports/refunds are currently disabled. Reject the request before parsing
+  // multipart data so no customer photo, generated image, or screenshot can
+  // be accepted or persisted through this endpoint.
+  if (!reportsEnabled()) {
+    return NextResponse.json(
+      { error: 'Reports are currently disabled.' },
+      { status: 410, headers: CORS },
+    );
+  }
+
   try {
     // Support both JSON (legacy) and multipart/form-data (new — carries the
     // customer's input photo for "bad try-on" reports so admin can compare
