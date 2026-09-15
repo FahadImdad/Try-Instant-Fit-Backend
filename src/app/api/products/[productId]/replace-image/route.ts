@@ -154,7 +154,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         product_id: product.sku,
         kind: 'process',
         amount: 1,
-        cost_usd: Number(brand.price_per_tryon_usd) || 0.125,
+        cost_usd: Number(brand.price_per_tryon_usd) || 0.25,
         notes: `Image replacement for ${product.name}`,
       });
     }

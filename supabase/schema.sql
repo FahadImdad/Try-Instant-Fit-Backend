@@ -231,7 +231,7 @@ CREATE INDEX IF NOT EXISTS idx_tryon_reports_created_at  ON tryon_reports(create
 CREATE INDEX IF NOT EXISTS idx_tryon_reports_type        ON tryon_reports(type);
 
 -- ── Credit Ledger (deep analytics: try-on vs image-processing splits) ────────
--- One row per credit-consuming event. Pricing is uniform: $0.125 per credit
+-- One row per credit-consuming event. Standard pricing is $0.25 per credit.
 -- regardless of kind. Used for per-brand breakdowns on the dashboard +
 -- admin panel; the brands.tryon_credits / tryon_credits_used aggregate
 -- counters remain the source of truth for live balances.
@@ -329,7 +329,7 @@ BEGIN
 
   INSERT INTO credit_ledger (brand_id, product_id, qr_id, tryon_id, kind, amount, cost_usd, report_id, notes)
   VALUES (r.brand_id, r.product_id, r.qr_id, r.tryon_id,
-          'refund', -1, -COALESCE(v_price, 0.125),
+          'refund', -1, -COALESCE(v_price, 0.25),
           r.id, CONCAT('Refund for report (', r.type, ')'));
 
   UPDATE tryon_reports

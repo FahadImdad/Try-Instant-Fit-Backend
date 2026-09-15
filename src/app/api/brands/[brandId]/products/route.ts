@@ -251,13 +251,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         product_uuid: product?.id ?? null,
       });
 
-      // Write credit_ledger row for deep analytics (uniform $0.125/credit)
+      // Write credit_ledger row for deep analytics using the brand's configured rate.
       await supabase.from('credit_ledger').insert({
         brand_id: brandId,
         product_id: resolvedSku,
         kind: 'process',
         amount: 1,
-        cost_usd: Number(brand.price_per_tryon_usd) || 0.125,
+        cost_usd: Number(brand.price_per_tryon_usd) || 0.25,
         notes: `Image processing for ${name.trim()}`,
       });
     }

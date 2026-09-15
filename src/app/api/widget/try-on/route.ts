@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', brandId);
 
-      // Write a credit_ledger row for deep analytics — uniform $0.125/credit
+      // Write a credit_ledger row for deep analytics using the brand's configured rate.
       // (or whatever the brand's price_per_tryon_usd is set to).
       await supabase.from('credit_ledger').insert({
         brand_id:   brandId,
@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
         tryon_id:   tryonId,
         kind:       'tryon',
         amount:     1,
-        cost_usd:   Number(brandQuota.price_per_tryon_usd) || 0.125,
+        cost_usd:   Number(brandQuota.price_per_tryon_usd) || 0.25,
         notes:      `Try-on (${source})`,
       });
     }
