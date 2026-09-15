@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     ] = await Promise.all([
       supabase
         .from('brands')
-        .select('id, name, email, website_url, status, tryon_credits, tryon_credits_used, price_per_tryon_usd, unlimited, created_at')
+        .select('id, name, email, contact_phone, website_url, status, tryon_credits, tryon_credits_used, price_per_tryon_usd, unlimited, created_at')
         .order('created_at', { ascending: false }),
       supabase
         .from('tryons')
