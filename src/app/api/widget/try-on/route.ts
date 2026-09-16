@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { geminiTryOn, TRYON_MODEL } from '@/lib/gemini';
+import { geminiTryOn } from '@/lib/gemini';
+import { altTryOn } from '@/lib/alt-engine';
 import { supabase } from '@/lib/supabase';
 
 // 60s timeout — single-call try-on, garment is pre-isolated at upload time.
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
     // ── Quota pre-check: brand must be admin-approved + have credits ───────
     const { data: brandQuota } = await supabase
       .from('brands')
-      .select('status, price_per_tryon_usd, tryon_credits, tryon_credits_used, unlimited')
+      .select('status, price_per_tryon_usd, tryon_credits, tryon_credits_used, unlimited, tryon_model_override')
       .eq('id', brandId)
       .maybeSingle();
 
@@ -176,15 +177,22 @@ export async function POST(request: NextRequest) {
 
     console.log(`[try-on] Using cached isolated garment (product=${productId})`);
 
-    const geminiResult = await geminiTryOn(
-      userPhotoBase64,
-      userPhotoFile.type,
-      garment,
-    );
-    const resultBase64 = geminiResult.data;
-    const resultMimeType = geminiResult.mimeType;
+    // Engine selection. Brands with tryon_model_override = NULL (i.e. every
+    // brand by default) use the locked default engine. 'alt' opts a single
+    // brand into the alternate engine for temporary quality evaluation.
+    const useAltEngine = brandQuota.tryon_model_override === 'alt';
+    if (useAltEngine) console.log(`[try-on] Brand ${brandId} is on the alternate engine.`);
 
-    const aiModel = TRYON_MODEL;
+    const engineResult = useAltEngine
+      ? await altTryOn(userPhotoBase64, userPhotoFile.type, garment)
+      : await geminiTryOn(userPhotoBase64, userPhotoFile.type, garment);
+
+    const resultBase64 = engineResult.data;
+    const resultMimeType = engineResult.mimeType;
+
+    // Record the engine that actually ran, so per-model quality and cost can
+    // be compared from the tryons table.
+    const aiModel = engineResult.model;
     console.log('[try-on] Done.');
 
     // ── Upload result to Google Cloud Storage ───────────────────────────────
