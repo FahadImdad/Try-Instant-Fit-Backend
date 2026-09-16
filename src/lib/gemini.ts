@@ -77,9 +77,13 @@ export async function isolateGarment(
           {
             text: `Show ONLY the clothing from this photo, by itself on a plain white background, as if worn on an invisible person.
 
-KEEP EVERY GARMENT. A garment is anything made of fabric that is worn on or draped over the body — including shirts, tops, kurtas, jackets, coats, outerwear, trousers, jeans, shalwar, skirts, dresses, and draped pieces such as scarves, dupattas, shawls, stoles and sashes. Keep ALL of them, including every layer, each in its natural worn or draped position and unchanged in design, color, pattern, and detail. When in doubt about a fabric item, KEEP it. Do not drop, merge, or simplify any garment that is present.
+KEEP EVERY GARMENT. A garment is anything made of fabric that is worn on or draped over the body — including shirts, tops, kurtas, jackets, coats, outerwear, trousers, jeans, shalwar, skirts, dresses, and draped pieces such as scarves, dupattas, shawls, stoles and sashes. Keep ALL of them, including every layer, each in its natural worn or draped position and unchanged in design, color, pattern, and detail. When in doubt about a fabric item, KEEP it. Do not drop, merge, simplify or replace any garment that is present.
 
-REMOVE EVERYTHING THAT IS NOT A GARMENT — that is, hard accessories and objects. Do not include: sunglasses or glasses, hats, caps, turbans or any headwear, earrings, necklaces, rings, bracelets, watches, belts, bags, handbags, purses, backpacks, shoes or any footwear, phones, cups, bottles, or any other object or prop the person is holding or carrying. If one of these overlaps a garment, reconstruct the garment underneath so it is whole and uninterrupted.
+REMOVE EVERYTHING THAT IS NOT A GARMENT — that is, hard accessories and objects. Do not include: sunglasses or glasses, hats, caps, turbans or any headwear, earrings, necklaces, rings, bracelets, watches, belts, bags, handbags, purses, backpacks, shoes or any footwear, phones, cups, bottles, or any other object or prop the person is holding or carrying. Where one of these covered part of a garment, fill in ONLY the small hidden patch, continuing the surrounding fabric's exact color, shade, pattern and weave so the seam is invisible. Do not redraw, restyle or re-render any garment beyond that hidden patch.
+
+MATCH EVERY GARMENT EXACTLY as it appears in the photo — identical color, shade, tone, wash, fade, fabric, texture, pattern, cut, length, fit and every seam, button, pocket and stitch. Do not change, lighten, darken, brighten, clean up, or substitute a garment for a similar-looking one. Denim in particular must keep its exact wash and shade: a grey or faded jean must stay that same grey or faded tone, never a brighter or bluer denim. This is a real product being sold — any change to its color or design is wrong.
+
+KEEP THE EXACT STYLING — how each garment is worn is part of the product and must be reproduced, not neutralised. Copy precisely: which parts are tucked in and which hang loose (a half-tuck or front-tuck stays a half-tuck, tucked on the same side, with the same loose drape elsewhere), how sleeves are rolled or pushed up and to what height, which buttons are done up or left open, how collars and lapels sit, and how hems fall. Do NOT straighten, untuck, even out, or tidy the styling into a plain catalogue hang.
 
 Do NOT invent or add any garment that is not in the photo. Reproduce only what is actually there.
 
@@ -125,7 +129,7 @@ IMAGE 2 defines the final image completely. Keep its exact camera framing, crop,
 
 Keep everything about the customer exactly as it is in IMAGE 2 — face, head, hair, skin, body proportions, pose, limb positions, anything they are holding, and the background. They are a real person with a real body filling the clothes, never a hollow or empty outfit.
 
-Change ONLY their clothing into the outfit from IMAGE 1, keeping its design the same and making it look naturally worn on their body in their pose, covering them modestly. Adapt the outfit to fit the visible crop — show only the portion of the garment that falls inside IMAGE 2's frame.` }],
+Change ONLY their clothing into the outfit from IMAGE 1, keeping its design the same and making it look naturally worn on their body in their pose, covering them modestly. Reproduce IMAGE 1's exact colors, shades and washes — never lighten, brighten or substitute a similar-looking fabric. Reproduce its styling too: keep the same tuck (a half-tuck or front-tuck stays tucked on the same side, loose elsewhere), the same sleeve roll, the same buttons open or closed, and the same drape — do not straighten, untuck or tidy it into a plain hang. Adapt the outfit to fit the visible crop — show only the portion of the garment that falls inside IMAGE 2's frame.` }],
     },
     contents: [
       {
