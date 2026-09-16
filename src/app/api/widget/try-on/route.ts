@@ -254,11 +254,21 @@ export async function POST(request: NextRequest) {
           .select('product_uuid')
           .eq('id', qrId)
           .single();
-        const { error: consumeError } = await supabase.rpc('consume_qr_tryon', {
+        const { data: consumedAccess, error: consumeError } = await supabase.rpc('consume_qr_tryon', {
           p_qr_id: qrId,
           p_passcode_id: passcodeId || null,
         });
         if (consumeError) throw consumeError;
+
+        // Do not allow a successful passcode try-on to be returned while its
+        // usage counter silently remains unchanged. This catches a missing or
+        // stale database function immediately in deployment logs.
+        if (passcodeId) {
+          const consumed = Array.isArray(consumedAccess) ? consumedAccess[0] : consumedAccess;
+          if (!consumed || typeof consumed.passcode_used !== 'number') {
+            throw new Error('Passcode usage was not recorded by consume_qr_tryon');
+          }
+        }
 
         // Increment brand passcode used_count + link tryon to passcode/product
         if (passcodeId) {

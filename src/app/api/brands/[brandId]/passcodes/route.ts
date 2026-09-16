@@ -6,7 +6,11 @@ const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
 };
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface RouteParams {
   params: Promise<{ brandId: string }>;
