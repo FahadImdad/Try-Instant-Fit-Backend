@@ -77,9 +77,9 @@ export async function isolateGarment(
           {
             text: `Show ONLY the clothing from this photo, by itself on a plain white background, as if worn on an invisible person.
 
-CLOTHING ONLY. Include every garment the person is wearing — shirts, tops, jackets, outerwear, trousers, jeans, skirts, dresses — each in its natural worn position and unchanged in design, color, pattern, and detail. Do not drop or merge any garment that is present.
+KEEP EVERY GARMENT. A garment is anything made of fabric that is worn on or draped over the body — including shirts, tops, kurtas, jackets, coats, outerwear, trousers, jeans, shalwar, skirts, dresses, and draped pieces such as scarves, dupattas, shawls, stoles and sashes. Keep ALL of them, including every layer, each in its natural worn or draped position and unchanged in design, color, pattern, and detail. When in doubt about a fabric item, KEEP it. Do not drop, merge, or simplify any garment that is present.
 
-REMOVE EVERYTHING THAT IS NOT CLOTHING. Do not include: sunglasses or glasses, hats, caps, turbans or any headwear, earrings, necklaces, rings, bracelets, watches, belts, bags, handbags, purses, backpacks, scarves, shoes or any footwear, phones, cups, bottles, or any other object, prop, or accessory the person is holding, wearing, or carrying. If an accessory overlaps a garment, reconstruct the garment underneath so it is whole and uninterrupted.
+REMOVE EVERYTHING THAT IS NOT A GARMENT — that is, hard accessories and objects. Do not include: sunglasses or glasses, hats, caps, turbans or any headwear, earrings, necklaces, rings, bracelets, watches, belts, bags, handbags, purses, backpacks, shoes or any footwear, phones, cups, bottles, or any other object or prop the person is holding or carrying. If one of these overlaps a garment, reconstruct the garment underneath so it is whole and uninterrupted.
 
 Do NOT invent or add any garment that is not in the photo. Reproduce only what is actually there.
 
