@@ -201,6 +201,16 @@ export async function GET(
     const garmentByProductId: Record<string, string | null> = {};
     for (const g of (garments ?? [])) garmentByProductId[g.product_id] = g.isolated_garment_url ?? null;
 
+    // Analytics events intentionally keep a lightweight JSON payload. Older
+    // Buy Now events may only contain the product UUID, so resolve display
+    // names and images from the canonical product record for the dashboard.
+    const { data: catalogProducts } = await supabase
+      .from('products')
+      .select('id, sku, name, image_url, isolated_garment_url')
+      .eq('brand_id', brandId);
+    const catalogProductById = new Map((catalogProducts ?? []).map(product => [product.id, product]));
+    const catalogProductBySku = new Map((catalogProducts ?? []).map(product => [product.sku, product]));
+
     // ── Per-product breakdowns, grouped by source ────────────────────────────
     const productMap = new Map<string, ProductBreakdown>();
     for (const r of tryons) {
@@ -257,13 +267,15 @@ export async function GET(
     for (const row of buyNowEvents ?? []) {
       const eventData = (row.event_data ?? {}) as Record<string, unknown>;
       const pid = String(eventData.product_uuid ?? eventData.product_id ?? 'unknown');
+      const product = catalogProductById.get(pid) ?? catalogProductBySku.get(pid);
       const current = buyClickMap.get(pid);
       if (current) current.click_count++;
       else buyClickMap.set(pid, {
-        product_id: pid,
-        product_name: String(eventData.product_name ?? leaderboardMap.get(pid)?.product_name ?? pid),
+        product_id: product?.id ?? pid,
+        product_name: product?.name ?? String(eventData.product_name ?? leaderboardMap.get(pid)?.product_name ?? pid),
         click_count: 1,
-        isolated_garment_url: garmentByProductId[pid] ?? leaderboardMap.get(pid)?.isolated_garment_url ?? null,
+        isolated_garment_url: product?.isolated_garment_url ?? product?.image_url
+          ?? garmentByProductId[pid] ?? leaderboardMap.get(pid)?.isolated_garment_url ?? null,
       });
     }
     const buyNowProducts = Array.from(buyClickMap.values())
