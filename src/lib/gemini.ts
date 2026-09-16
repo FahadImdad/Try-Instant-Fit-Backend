@@ -123,19 +123,9 @@ export async function geminiTryOn(
   // Step 2: Apply isolated outfit to customer photo
   const result = await callGemini({
     systemInstruction: {
-      parts: [{ text: `Dress the customer in IMAGE 2 in the garment shown in IMAGE 1. IMAGE 1 is ONLY a flat swatch reference for that garment's design, color, pattern, and fabric. Ignore everything else about IMAGE 1 — its pose, its framing, its crop, its body proportions, its waistband and hemline, and any emptiness or hollowness. Never copy IMAGE 1's composition.
+      parts: [{ text: `Put the outfit from IMAGE 1 onto the customer in IMAGE 2. IMAGE 1 is only a flat reference for the outfit's design, color, and fabric — it may show the outfit with no person inside, but ignore that; do NOT copy any emptiness or hollowness from it.
 
-IMAGE 2 defines the final image completely. Keep its exact camera framing, crop, zoom, aspect ratio, and composition. The customer's body must be shown to exactly the same extent as in IMAGE 2 and no further: if IMAGE 2 is cropped at the waist, the result is cropped at the waist; if the legs or feet are not in IMAGE 2, they must NOT appear in the result. Do NOT zoom out, extend the frame, add missing body parts, or turn a partial shot into a full-body shot.
-
-Keep everything about the customer exactly as it is in IMAGE 2 — face, head, hair, skin, body proportions, pose, limb positions, anything they are holding, and the background. They are a real person with a real body filling the clothes, never a hollow or empty outfit.
-
-REPLACE ONLY THE MATCHING GARMENTS, AND KEEP THE CUSTOMER'S OWN CLOTHES EVERYWHERE ELSE. IMAGE 1 may show a full outfit, but only swap the pieces it actually covers. If IMAGE 1 shows a top (shirt, kurta, jacket), replace only the customer's top and KEEP THEIR OWN trousers, jeans, skirt or lower garment exactly as they are in IMAGE 2 — same denim wash, shade, cut and length, unchanged. If IMAGE 1 shows only a lower garment, replace only their lower garment and keep their own top. Never swap, restyle, recolor or replace a garment that IMAGE 1 does not show, and never add a belt, waistband or any piece the customer is not already wearing.
-
-Reproduce IMAGE 1's exact colors, shades, patterns and fabric for the garments you do replace — never lighten, brighten or substitute a similar-looking fabric. Carry over how that garment itself is worn — its sleeve roll, which buttons are open or closed, its collar and its drape.
-
-HOW THE NEW GARMENT MEETS THE CUSTOMER'S OWN CLOTHES is decided by IMAGE 2, not IMAGE 1. Keep the customer's existing tuck: if their top hangs loose over their trousers in IMAGE 2, the new top hangs loose too; if it was tucked, keep it tucked the same way. Do NOT tuck in a top that was untucked, do NOT untuck one that was tucked, and do NOT copy the tuck, waistband or hemline from IMAGE 1.
-
-Make the replaced garment look naturally worn on their body in their pose, covering them modestly. Adapt it to fit the visible crop — show only the portion that falls inside IMAGE 2's frame.` }],
+The customer in IMAGE 2 is a real person and must stay fully visible and intact: keep their face, head, hair, neck, hands, arms, legs, feet, body, pose, and background exactly as they are. The person is wearing the outfit — there is always a real body filling the clothes, never a hollow or empty outfit. Only change their clothing into the outfit from IMAGE 1, keeping its design the same and making it look naturally worn on their body in their pose, covering them modestly.` }],
     },
     contents: [
       {
@@ -145,7 +135,7 @@ Make the replaced garment look naturally worn on their body in their pose, cover
           { inlineData: { data: garment.data, mimeType: garment.mimeType } },
           { text: 'IMAGE 2 — the customer:' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
-          { text: 'Now show this same customer wearing the garment from IMAGE 1 — naturally fitted to their body and pose, covering them modestly, with no hollow or empty parts. Swap ONLY the pieces IMAGE 1 actually shows: keep the customer\'s own trousers, jeans or lower garment from IMAGE 2 exactly as they are if IMAGE 1 is a top, and add no belt or piece they were not already wearing. Keep their existing tuck as it is in IMAGE 2 — do not tuck in a top that was hanging loose. Keep IMAGE 2 exactly as it is apart from the swapped garment: same face, hair, body, pose, held objects, background, and above all the same camera crop and framing. Show no more of their body than IMAGE 2 already shows — do not extend the frame or invent body parts that are outside it.' },
+          { text: 'Now show this same customer, fully visible as a real person, wearing the outfit from IMAGE 1 — naturally fitted to their body and pose, covering them modestly, with no hollow or empty parts. Keep their face, head, hair, hands, feet, body, pose, and background unchanged.' },
         ],
       },
     ],

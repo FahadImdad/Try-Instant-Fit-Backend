@@ -203,6 +203,11 @@ export async function POST(request: NextRequest) {
         brand_id:           brandId,
         product_id:         productId,
         product_name:       productName,
+        // Catalog-browse try-ons carry the product's uuid but no QR, so the
+        // Scan & Wear block below never runs and previously left this null.
+        // Set it up front; the QR path overwrites it with the QR's own
+        // product_uuid, which is the same row.
+        product_uuid:       productUuid || null,
         result_image_url:   null,
         ai_model:           aiModel,
         processing_time_ms: processingTimeMs,
@@ -284,7 +289,13 @@ export async function POST(request: NextRequest) {
           completed_at: new Date().toISOString(),
         });
       } catch (e) {
-        console.error('[try-on] Scan & Wear bookkeeping failed:', e instanceof Error ? e.message : String(e));
+        // Swallowed so a bookkeeping failure never costs the customer their
+        // try-on, but log loudly with the ids: a silent failure here is why
+        // passcode counters and qr_scans can silently stop recording.
+        console.error(
+          `[try-on] Scan & Wear bookkeeping FAILED qr=${qrId} passcode=${passcodeId ?? 'none'} tryon=${tryonId ?? 'none'}:`,
+          e instanceof Error ? e.message : String(e),
+        );
       }
     }
 

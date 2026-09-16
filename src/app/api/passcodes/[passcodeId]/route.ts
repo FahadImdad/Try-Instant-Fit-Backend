@@ -72,9 +72,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     let incremented: unknown = null;
     if ('additional_uses' in body) {
+      // The dashboard sends the delta between current and desired remaining
+      // credits: 0 when only the label or code changed, negative when the
+      // vendor lowers the allowance. Rejecting anything below 1 meant an edit
+      // that did not touch credits failed with a 400 and saved nothing.
+      // add_passcode_uses clamps a decrease so used credits stay protected.
       const additional = Number(body.additional_uses);
-      if (!Number.isInteger(additional) || additional < 1 || additional > 100000) {
-        return NextResponse.json({ error: 'Additional try-ons must be a whole number between 1 and 100000' }, { status: 400, headers: CORS });
+      if (!Number.isInteger(additional) || additional < -100000 || additional > 100000) {
+        return NextResponse.json({ error: 'Try-on change must be a whole number between -100000 and 100000' }, { status: 400, headers: CORS });
       }
       const { data, error } = await supabase.rpc('add_passcode_uses', {
         p_passcode_id: passcodeId,
