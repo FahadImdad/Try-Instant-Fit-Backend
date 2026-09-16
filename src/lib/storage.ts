@@ -122,28 +122,31 @@ export async function uploadPaymentScreenshot(
 }
 
 /**
- * Save a customer's input photo when they submit a "bad try-on" report.
- * Normally the input photo is ephemeral and never stored — but if a user
- * is unhappy with the AI result, we keep their photo alongside the report
- * so admin/AI ops can compare before vs. after and tune the model. Lives
- * under reports/ so it can be lifecycled separately from try-on assets.
+ * DISABLED — DO NOT RE-ENABLE WITHOUT UPDATING THE PRIVACY POLICY FIRST.
+ *
+ * This used to persist a customer's input body photo alongside a "bad try-on"
+ * report. Reports are now switched off (see /api/reports, which returns 410)
+ * and customer imagery is strictly ephemeral: the input photo is never written
+ * to storage, and the generated try-on is returned to the browser as a data:
+ * URI instead of being uploaded.
+ *
+ * Our published Privacy Policy makes an affirmative "Zero-Retention Biometric
+ * Data Guarantee" — that we keep zero copies of end-user body photos and
+ * rendered previews. Persisting a customer photo here would make that public
+ * statement false.
+ *
+ * Kept as a throwing stub rather than deleted so that any future caller fails
+ * loudly at the point of misuse instead of silently restoring retention.
  */
 export async function uploadReportUserPhoto(
-  imageBuffer: Buffer,
-  brandId: string,
-  mimeType = 'image/jpeg'
-): Promise<string> {
-  const bucketName = process.env.GOOGLE_CLOUD_BUCKET_NAME;
-  if (!bucketName) throw new Error('GOOGLE_CLOUD_BUCKET_NAME is required');
-  const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
-  const fileName = `reports/${brandId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const bucket = getStorage().bucket(bucketName);
-  await bucket.file(fileName).save(imageBuffer, {
-    contentType: mimeType,
-    metadata: { cacheControl: 'public, max-age=31536000' },
-    public: true,
-  });
-  return `https://storage.googleapis.com/${bucketName}/${fileName}`;
+  _imageBuffer: Buffer,
+  _brandId: string,
+  _mimeType = 'image/jpeg'
+): Promise<never> {
+  throw new Error(
+    'uploadReportUserPhoto is permanently disabled: storing end-user body photos ' +
+    'would violate the zero-retention guarantee in our published Privacy Policy.'
+  );
 }
 
 export async function uploadTryOnResult(
