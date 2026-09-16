@@ -130,10 +130,10 @@ export async function GET(
     for (const s of SOURCES) bySource[s].cost_usd_total = Math.round(bySource[s].cost_usd_total * 10000) / 10000;
 
     // ── Button clicks (Ghost Layer widget specific) ──────────────────────────
-    const [{ count: buttonClicks }, { count: buyNowClicks }] = await Promise.all([
+    const [{ count: buttonClicks }, { data: buyNowEvents, count: buyNowClicks }] = await Promise.all([
       supabase.from('analytics_events').select('*', { count: 'exact', head: true })
         .eq('brand_id', brandId).eq('event_name', 'tryon_opened'),
-      supabase.from('analytics_events').select('*', { count: 'exact', head: true })
+      supabase.from('analytics_events').select('event_data', { count: 'exact' })
         .eq('brand_id', brandId).eq('event_name', 'buy_now_clicked'),
     ]);
 
@@ -246,7 +246,28 @@ export async function GET(
     }
     const topGarments = Array.from(leaderboardMap.values())
       .sort((a, b) => b.tryon_count - a.tryon_count || a.product_name.localeCompare(b.product_name))
-      .slice(0, 5)
+      .map((item, index) => ({ rank: index + 1, ...item }));
+
+    const buyClickMap = new Map<string, {
+      product_id: string;
+      product_name: string;
+      click_count: number;
+      isolated_garment_url: string | null;
+    }>();
+    for (const row of buyNowEvents ?? []) {
+      const eventData = (row.event_data ?? {}) as Record<string, unknown>;
+      const pid = String(eventData.product_uuid ?? eventData.product_id ?? 'unknown');
+      const current = buyClickMap.get(pid);
+      if (current) current.click_count++;
+      else buyClickMap.set(pid, {
+        product_id: pid,
+        product_name: String(eventData.product_name ?? leaderboardMap.get(pid)?.product_name ?? pid),
+        click_count: 1,
+        isolated_garment_url: garmentByProductId[pid] ?? leaderboardMap.get(pid)?.isolated_garment_url ?? null,
+      });
+    }
+    const buyNowProducts = Array.from(buyClickMap.values())
+      .sort((a, b) => b.click_count - a.click_count || a.product_name.localeCompare(b.product_name))
       .map((item, index) => ({ rank: index + 1, ...item }));
 
     // ── Scan & Wear specific (QRs + brand-wide passcodes + scan events) ─────
@@ -330,6 +351,7 @@ export async function GET(
       // Legacy fields (existing dashboard still reads these)
       recent,
       top_garments: topGarments,
+      buy_now_products: buyNowProducts,
       products: allProducts.map(p => ({
         product_id: p.product_id,
         product_name: p.product_name,
