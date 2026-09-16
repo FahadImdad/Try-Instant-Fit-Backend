@@ -16,8 +16,14 @@ import crypto from 'crypto';
  * covered by this — shoppers have no login and those paths must stay open.
  */
 
-const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;   // 7 days for a vendor session
-const ADMIN_TOKEN_TTL_MS = 60 * 60 * 1000;      // 1 hour when admin opens a dashboard
+// A vendor stays signed in on the same device for a week, across tab and
+// browser closes — they should not be asked again during normal daily use.
+const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Admin tokens carry no expiry at all — see issueBrandToken. They are minted
+// only behind admin Basic Auth, and those credentials already grant access to
+// every brand, so a long-lived token gives nothing that could not be obtained
+// again in a single request.
 
 export const BRAND_CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -50,7 +56,9 @@ function constantTimeEqual(a: string, b: string): boolean {
  * console to open a vendor dashboard.
  */
 export function issueBrandToken(brandId: string, scope: 'brand' | 'admin' = 'brand'): string {
-  const expires = Date.now() + (scope === 'admin' ? ADMIN_TOKEN_TTL_MS : TOKEN_TTL_MS);
+  // 'never' rather than a number for admin, so the expiry check has an
+  // explicit case instead of depending on how Infinity round-trips.
+  const expires = scope === 'admin' ? 'never' : String(Date.now() + TOKEN_TTL_MS);
   const payload = `${brandId}.${expires}.${scope}`;
   return `${Buffer.from(payload).toString('base64url')}.${sign(payload)}`;
 }
@@ -74,9 +82,15 @@ function verifyBrandToken(token: string, brandId: string): boolean {
   if (!constantTimeEqual(sign(payload), signature)) return false;
 
   const [tokenBrandId, expiresRaw] = payload.split('.');
-  const expires = Number(expiresRaw);
-  if (!tokenBrandId || !Number.isFinite(expires)) return false;
-  if (Date.now() > expires) return false;
+  if (!tokenBrandId) return false;
+
+  // Admin tokens never expire; everything else must carry a real timestamp.
+  // The signature was already verified above, so 'never' cannot be forged.
+  if (expiresRaw !== 'never') {
+    const expires = Number(expiresRaw);
+    if (!Number.isFinite(expires)) return false;
+    if (Date.now() > expires) return false;
+  }
 
   // A valid token for one brand must not unlock another.
   return constantTimeEqual(tokenBrandId, brandId);
