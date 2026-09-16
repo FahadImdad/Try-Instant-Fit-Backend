@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { requireBrandAuth } from '@/lib/brand-auth';
 import { uploadBrandLogo } from '@/lib/storage';
 
 const CORS = {
@@ -34,6 +35,7 @@ interface RouteParams {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { brandId } = await params;
+    const unauthorized = requireBrandAuth(request, brandId); if (unauthorized) return unauthorized;
     const ct = request.headers.get('content-type') || '';
 
     const allowed = [

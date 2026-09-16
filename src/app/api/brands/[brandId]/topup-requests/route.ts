@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { requireBrandAuth } from '@/lib/brand-auth';
 import { uploadPaymentScreenshot } from '@/lib/storage';
 
 const CORS = {
@@ -19,9 +20,10 @@ interface RouteParams {
  * GET /api/brands/[brandId]/topup-requests
  * Brand sees their topup history (newest first).
  */
-export async function GET(_request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { brandId } = await params;
+    const unauthorized = requireBrandAuth(request, brandId); if (unauthorized) return unauthorized;
     const { data, error } = await supabase
       .from('credit_topup_requests')
       .select('*')
@@ -66,6 +68,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { brandId } = await params;
+    const unauthorized = requireBrandAuth(request, brandId); if (unauthorized) return unauthorized;
     const ct = request.headers.get('content-type') || '';
 
     let amountUsd: number;

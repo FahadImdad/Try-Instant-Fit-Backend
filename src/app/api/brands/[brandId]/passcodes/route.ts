@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { requireBrandAuth } from '@/lib/brand-auth';
 import { generatePasscode } from '@/lib/qr';
 
 const CORS = {
@@ -20,9 +21,10 @@ interface RouteParams {
  * GET /api/brands/[brandId]/passcodes
  * List all brand-wide passcodes (works across any QR for this brand).
  */
-export async function GET(_request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { brandId } = await params;
+    const unauthorized = requireBrandAuth(request, brandId); if (unauthorized) return unauthorized;
     const { data, error } = await supabase
       .from('brand_passcodes')
       .select('id, code, customer_label, use_limit, used_count, expires_at, active, created_at')
@@ -48,6 +50,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { brandId } = await params;
+    const unauthorized = requireBrandAuth(request, brandId); if (unauthorized) return unauthorized;
     const body = await request.json();
     const { code, customer_label, use_limit, expires_at } = body ?? {};
 

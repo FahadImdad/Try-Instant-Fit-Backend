@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { requireBrandAuth } from '@/lib/brand-auth';
 import { uploadProductImage, uploadIsolatedGarment } from '@/lib/storage';
 import { isolateGarment, TRYON_MODEL } from '@/lib/gemini';
 
@@ -55,9 +56,10 @@ interface RouteParams {
  * GET /api/brands/[brandId]/products
  * List all products for a brand.
  */
-export async function GET(_request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { brandId } = await params;
+    const unauthorized = requireBrandAuth(request, brandId); if (unauthorized) return unauthorized;
     const { data, error } = await supabase
       .from('products')
       .select('id, sku, name, price, currency, description, category, category_group, audience, available_sizes, custom_size_available, custom_size_note, show_in_catalog, buy_url, image_url, isolated_garment_url, active, created_at')
@@ -81,6 +83,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { brandId } = await params;
+    const unauthorized = requireBrandAuth(request, brandId); if (unauthorized) return unauthorized;
     const ct = request.headers.get('content-type') || '';
     let body: Record<string, unknown> = {};
     let imageFile: File | null = null;

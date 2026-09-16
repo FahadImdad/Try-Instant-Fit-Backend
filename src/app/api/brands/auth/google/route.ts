@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { OAuth2Client } from 'google-auth-library';
 import { supabase } from '@/lib/supabase';
+import { issueBrandToken } from '@/lib/brand-auth';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -82,6 +83,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Google has verified this email and it matches the brand's registered
+    // address, so this is the one place a brand session is legitimately
+    // minted. A brand_id on its own proves nothing — it travels in URLs.
     return NextResponse.json(
       {
         brand_id: brand.id,
@@ -89,6 +93,7 @@ export async function POST(request: NextRequest) {
         email: brand.email,
         status: brand.status,
         google_picture: picture,
+        token: issueBrandToken(brand.id),
       },
       { status: 200, headers: CORS },
     );

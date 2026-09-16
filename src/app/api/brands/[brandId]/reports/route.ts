@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { requireBrandAuth } from '@/lib/brand-auth';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -23,6 +24,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { brandId } = await params;
+    const unauthorized = requireBrandAuth(request, brandId); if (unauthorized) return unauthorized;
     if (!brandId) {
       return NextResponse.json({ error: 'brandId required' }, { status: 400, headers: CORS });
     }

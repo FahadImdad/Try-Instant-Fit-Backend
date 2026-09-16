@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { requireBrandAuth } from '@/lib/brand-auth';
 import { QR_CORS } from '@/lib/qr';
 
 interface RouteParams {
@@ -10,9 +11,10 @@ interface RouteParams {
  * GET /api/brands/[brandId]/qr-codes
  * List all QR codes for a brand (for dashboard).
  */
-export async function GET(_request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { brandId } = await params;
+    const unauthorized = requireBrandAuth(request, brandId); if (unauthorized) return unauthorized;
 
     const { data, error } = await supabase
       .from('qr_codes')

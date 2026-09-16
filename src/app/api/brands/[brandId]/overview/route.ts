@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { requireBrandAuth } from '@/lib/brand-auth';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -29,10 +30,11 @@ interface ProductBreakdown {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ brandId: string }> }
 ) {
   const { brandId } = await params;
+  const unauthorized = requireBrandAuth(request, brandId); if (unauthorized) return unauthorized;
 
   try {
     // Brand info (incl. credit balance + profile fields the dashboard's

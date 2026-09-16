@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { requireBrandAuth } from '@/lib/brand-auth';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,7 @@ interface RouteParams { params: Promise<{ brandId: string }> }
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { brandId } = await params;
+    const unauthorized = requireBrandAuth(request, brandId); if (unauthorized) return unauthorized;
     const url = new URL(request.url);
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '200', 10) || 200, 500);
     const { data, error } = await supabase
