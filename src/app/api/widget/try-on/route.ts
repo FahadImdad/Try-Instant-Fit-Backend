@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     // products.id PK) when a shopper tries on an item from the "More from
     // {Brand}" grid. We resolve its SKU (= product_garments.product_id) and
     // name below, so the rest of the flow is identical to the QR path.
-    const productUuid     = formData.get('product_uuid')      as string | null;
+    let   productUuid     = formData.get('product_uuid')      as string | null;
     // Model + output resolution are LOCKED server-side (max dim 512). Any
     // model/provider/resolution fields sent by the client are ignored — the
     // AI engine is never selectable from, or exposed to, the client.
@@ -84,6 +84,23 @@ export async function POST(request: NextRequest) {
       }
       productId   = productId   || prod.sku;
       productName = productName || prod.name;
+    }
+
+    // A QR scan often submits the SKU but not products.id. Resolve the QR's
+    // canonical product relationship before inserting the try-on so product
+    // and passcode analytics are written atomically with the try-on record.
+    if (qrId) {
+      const { data: qrProduct, error: qrProductError } = await supabase
+        .from('qr_codes')
+        .select('brand_id, product_id, product_uuid, product_name')
+        .eq('id', qrId)
+        .maybeSingle();
+      if (qrProductError || !qrProduct || qrProduct.brand_id !== brandId) {
+        return NextResponse.json({ error: 'QR product could not be resolved' }, { status: 404 });
+      }
+      productId = productId || qrProduct.product_id;
+      productUuid = productUuid || qrProduct.product_uuid;
+      productName = productName || qrProduct.product_name;
     }
 
     // product_image_url is only used as a fallback display ref and isn't
@@ -216,6 +233,7 @@ export async function POST(request: NextRequest) {
         // Set it up front; the QR path overwrites it with the QR's own
         // product_uuid, which is the same row.
         product_uuid:       productUuid || null,
+        brand_passcode_id:  passcodeId || null,
         result_image_url:   null,
         ai_model:           aiModel,
         processing_time_ms: processingTimeMs,
@@ -225,8 +243,14 @@ export async function POST(request: NextRequest) {
       .select('id')
       .single();
 
-    const tryonId = tryonInsert.data?.id ?? null;
-    if (tryonInsert.error) console.error('[try-on] Failed to save tryon record:', tryonInsert.error.message);
+    if (tryonInsert.error || !tryonInsert.data?.id) {
+      console.error('[try-on] Failed to save tryon record:', tryonInsert.error?.message || 'No row returned');
+      return NextResponse.json({
+        error: 'The try-on was generated but its usage could not be recorded. Please try again.',
+        code: 'TRYON_RECORD_FAILED',
+      }, { status: 500 });
+    }
+    const tryonId = tryonInsert.data.id;
 
     // ── Decrement brand credits (only on successful try-on) ────────────────
     if (!brandQuota.unlimited) {
