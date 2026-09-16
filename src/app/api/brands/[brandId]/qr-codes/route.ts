@@ -26,23 +26,47 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const qrRows = data ?? [];
     const qrIds = qrRows.map(q => q.id);
-    const { data: scanRows } = qrIds.length
-      ? await supabase
-          .from('qr_scans')
-          .select('qr_id, brand_passcode_id, completed_at, status')
-          .in('qr_id', qrIds)
-          .eq('status', 'completed')
-      : { data: [] };
+
+    // Usage counts come from `tryons`, not `qr_scans`.
+    //
+    // A try-on row is written for every successful try-on and stamps
+    // brand_passcode_id as it runs, so it is the authoritative record both of
+    // what happened and of which try-ons used a passcode. A scan row is
+    // written alongside, but a try-on can exist without a completed scan row —
+    // counting scans under-reported the total, and the dashboard then derived
+    // "free" by subtracting passcode from a different, larger total, which is
+    // what inflated that figure on the product card.
+    //
+    // Taking all three from one table means total = free + passcode always
+    // reconciles.
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
-    const scanStats: Record<string, { today: number; free: number; passcode: number }> = {};
-    for (const scan of scanRows ?? []) {
-      const stats = scanStats[scan.qr_id] ?? { today: 0, free: 0, passcode: 0 };
-      const completedAt = scan.completed_at;
-      if (completedAt && new Date(completedAt) >= todayStart) stats.today += 1;
-      if (scan.brand_passcode_id) stats.passcode += 1;
-      else stats.free += 1;
-      scanStats[scan.qr_id] = stats;
+
+    const { data: tryonRows } = qrIds.length
+      ? await supabase
+          .from('tryons')
+          .select('product_id, product_uuid, product_name, brand_passcode_id, created_at')
+          .eq('brand_id', brandId)
+      : { data: [] };
+
+    // Keyed by both SKU and product uuid, mirroring how a QR resolves its
+    // product below, so either linkage counts.
+    const usageByProduct: Record<string, { today: number; free: number; passcode: number; total: number }> = {};
+    const bump = (key: string | null, row: { brand_passcode_id: string | null; created_at: string }) => {
+      if (!key) return;
+      const stats = usageByProduct[key] ?? { today: 0, free: 0, passcode: 0, total: 0 };
+      stats.total += 1;
+      if (row.brand_passcode_id) stats.passcode += 1; else stats.free += 1;
+      if (new Date(row.created_at) >= todayStart) stats.today += 1;
+      usageByProduct[key] = stats;
+    };
+
+    for (const t of tryonRows ?? []) {
+      // "[Setup] …" rows are the one-off garment isolation charged when a
+      // product is added — not a customer try-on.
+      if ((t.product_name ?? '').startsWith('[Setup]')) continue;
+      bump(t.product_id, t);
+      if (t.product_uuid && t.product_uuid !== t.product_id) bump(t.product_uuid, t);
     }
 
     // Fetch all the brand's products in one shot, key by id and sku
@@ -81,11 +105,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const scanBase = process.env.PUBLIC_SCAN_BASE_URL || 'https://tryinstantfit.com';
     const qrs = qrRows.map(q => {
       const p = (q.product_uuid && productByUuid[q.product_uuid]) || productBySku[q.product_id];
+      // Resolve usage the same way the product itself is resolved: by uuid
+      // first, then SKU.
+      const usage = (q.product_uuid && usageByProduct[q.product_uuid]) || usageByProduct[q.product_id];
       return {
         ...q,
-        today_tryons: scanStats[q.id]?.today ?? 0,
-        free_tryons: scanStats[q.id]?.free ?? q.free_used_count ?? 0,
-        passcode_tryons: scanStats[q.id]?.passcode ?? Math.max(0, (q.total_used ?? 0) - (q.free_used_count ?? 0)),
+        today_tryons: usage?.today ?? 0,
+        free_tryons: usage?.free ?? 0,
+        passcode_tryons: usage?.passcode ?? 0,
+        // Authoritative total, so the card's three figures always reconcile.
+        total_tryons: usage?.total ?? 0,
         product: p
           ? { id: p.id, sku: p.sku, name: p.name, price: p.price, currency: p.currency, image_url: p.image_url }
           : null,
