@@ -33,7 +33,51 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       .eq('brand_passcode_id', passcodeId)
       .order('created_at', { ascending: false });
 
-    return NextResponse.json({ passcode, tryons: tryons ?? [] }, { status: 200, headers: CORS });
+    // Attach each try-on's product imagery. result_image_url is the generated
+    // try-on, which is never retained, so on its own every row renders as a
+    // placeholder. The product's own image is what identifies the article —
+    // the same picture the product card and the analytics leaderboard show.
+    const rows = tryons ?? [];
+    const skus = [...new Set(rows.map(t => t.product_id).filter(Boolean))] as string[];
+
+    const [{ data: products }, { data: garments }] = await Promise.all([
+      supabase
+        .from('products')
+        .select('id, sku, name, price, currency, image_url, isolated_garment_url')
+        .eq('brand_id', passcode.brand_id),
+      // Legacy fallback for products created before the products table.
+      skus.length
+        ? supabase
+            .from('product_garments')
+            .select('product_id, isolated_garment_url')
+            .eq('brand_id', passcode.brand_id)
+            .in('product_id', skus)
+        : Promise.resolve({ data: [] as { product_id: string; isolated_garment_url: string | null }[] }),
+    ]);
+
+    const byUuid = new Map((products ?? []).map(p => [p.id, p]));
+    const bySku  = new Map((products ?? []).map(p => [p.sku, p]));
+    const legacyBySku = new Map((garments ?? []).map(g => [g.product_id, g.isolated_garment_url]));
+
+    const enriched = rows.map(t => {
+      const p = (t.product_uuid ? byUuid.get(t.product_uuid) : undefined)
+             ?? (t.product_id ? bySku.get(t.product_id) : undefined)
+             ?? null;
+      return {
+        ...t,
+        // Prefer the isolated garment (what the leaderboard shows), then the
+        // uploaded product photo, then the legacy garment record.
+        product_image_url: p?.isolated_garment_url || p?.image_url
+          || (t.product_id ? legacyBySku.get(t.product_id) : null) || null,
+        // The canonical product uuid, so the dashboard can open the right
+        // product card even when the try-on only recorded a SKU.
+        resolved_product_uuid: p?.id ?? t.product_uuid ?? null,
+        product_price: p?.price ?? null,
+        product_currency: p?.currency ?? null,
+      };
+    });
+
+    return NextResponse.json({ passcode, tryons: enriched }, { status: 200, headers: CORS });
   } catch (e) {
     console.error('[passcodes/[id] GET]', e);
     return NextResponse.json({ error: 'Failed to load passcode' }, { status: 500, headers: CORS });
