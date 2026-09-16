@@ -359,9 +359,14 @@ export async function POST(request: NextRequest) {
     }
 
     // NOTE: never return the AI model/provider to the client — it's secret.
+    // The ONE exception is a brand explicitly opted into engine testing
+    // (tryon_model_override is set), so the tester can confirm which engine
+    // served the result without reading the database. Real brands have a NULL
+    // override and so never receive this field. Remove once testing is done.
     return NextResponse.json({
       result_url:         resultUrl,
       processing_time_ms: processingTimeMs,
+      ...(brandQuota.tryon_model_override ? { debug_engine: aiModel } : {}),
     });
 
   } catch (error) {
