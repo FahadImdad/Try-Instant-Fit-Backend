@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { geminiTryOn } from '@/lib/gemini';
-import { altTryOn } from '@/lib/alt-engine';
+import { altTryOn, AltEngineError } from '@/lib/alt-engine';
 import { supabase } from '@/lib/supabase';
 
 // 60s timeout — single-call try-on, garment is pre-isolated at upload time.
@@ -375,10 +375,15 @@ export async function POST(request: NextRequest) {
     // Log the raw error server-side only. Do NOT echo it to the client — the
     // underlying AI provider/model is secret and raw errors can leak it.
     console.error('[try-on] Unhandled error:', msg, error);
+    // TEMPORARY (engine testing): only an AltEngineError carries a detail, and
+    // only a brand explicitly opted into engine testing can reach the alternate
+    // engine at all. Customers on the default engine never get this field.
+    const altDetail = error instanceof AltEngineError ? error.detail : null;
     return NextResponse.json(
       {
         error: 'Something went wrong generating your try-on. Please try again.',
         processing_time_ms: processingTimeMs,
+        ...(altDetail ? { debug_engine_error: altDetail } : {}),
       },
       { status: 500 }
     );

@@ -11,6 +11,17 @@ import sharp from 'sharp';
 export const ALT_TRYON_MODEL = 'gpt-image-1-mini';
 export const ALT_TRYON_MAX_DIM = 512;
 
+// Carries the upstream failure detail alongside the customer-safe message, so
+// an engine-testing brand can see why a call failed without reading the logs.
+export class AltEngineError extends Error {
+  detail: string;
+  constructor(message: string, detail: string) {
+    super(message);
+    this.name = 'AltEngineError';
+    this.detail = detail;
+  }
+}
+
 // Mirrors the default engine's two-reference framing. IMAGE 1 is the isolated
 // garment, IMAGE 2 the customer — same ordering, same intent.
 const ALT_PROMPT = `Put the outfit from IMAGE 1 onto the customer in IMAGE 2.
@@ -73,7 +84,13 @@ export async function altTryOn(
   if (!response.ok) {
     const text = await response.text();
     console.error(`[try-on] Alternate engine ${response.status}:`, text);
-    throw new Error('AI could not generate the try-on. Please try a clearer, front-facing photo.');
+    // Carry the upstream detail on the error so the route can surface it to a
+    // brand that is explicitly engine-testing. Customers still see only the
+    // friendly message above.
+    throw new AltEngineError(
+      'AI could not generate the try-on. Please try a clearer, front-facing photo.',
+      `${response.status}: ${text.slice(0, 300)}`,
+    );
   }
 
   const json = await response.json();
@@ -81,7 +98,10 @@ export async function altTryOn(
 
   if (!b64) {
     console.error('[try-on] No image from alternate engine:', JSON.stringify(json).slice(0, 500));
-    throw new Error('AI could not generate the try-on. Please try a clearer, front-facing photo.');
+    throw new AltEngineError(
+      'AI could not generate the try-on. Please try a clearer, front-facing photo.',
+      `no image in response: ${JSON.stringify(json).slice(0, 300)}`,
+    );
   }
 
   if (json.usage) console.log('[try-on] Alternate engine usage:', JSON.stringify(json.usage));
