@@ -75,11 +75,15 @@ export async function isolateGarment(
         role: 'user',
         parts: [
           {
-            text: `Show this look by itself on a plain white background, as if worn on an invisible person.
+            text: `Show ONLY the clothing from this photo, by itself on a plain white background, as if worn on an invisible person.
 
-Only reproduce items that are ACTUALLY VISIBLE in the photo — exactly as they appear. Do NOT invent, add, or generate anything that is not in the photo: if there is no turban/cap, do not add one; if there are no shoes shown, do not add shoes; add no jewelry, belt, or piece that isn't already there. Keep every item that IS in the photo (clothing, and any headwear, footwear, jewelry, or belt the person is actually wearing), each in its natural worn position and unchanged in design, color, and detail. Do not drop or merge any item that is present.
+CLOTHING ONLY. Include every garment the person is wearing — shirts, tops, jackets, outerwear, trousers, jeans, skirts, dresses — each in its natural worn position and unchanged in design, color, pattern, and detail. Do not drop or merge any garment that is present.
 
-Show NO human body parts at all — no face, head, hair, neck, skin, hands, arms, legs, or feet. The items hold their natural worn shape on an empty invisible person. Only the items on a plain white background, nothing of a person.`,
+REMOVE EVERYTHING THAT IS NOT CLOTHING. Do not include: sunglasses or glasses, hats, caps, turbans or any headwear, earrings, necklaces, rings, bracelets, watches, belts, bags, handbags, purses, backpacks, scarves, shoes or any footwear, phones, cups, bottles, or any other object, prop, or accessory the person is holding, wearing, or carrying. If an accessory overlaps a garment, reconstruct the garment underneath so it is whole and uninterrupted.
+
+Do NOT invent or add any garment that is not in the photo. Reproduce only what is actually there.
+
+Show NO human body parts at all — no face, head, hair, neck, skin, hands, arms, legs, or feet. The clothing holds its natural worn shape on an empty invisible person. Only the clothing on a plain white background — nothing else.`,
           },
           { inlineData: { data: productBase64, mimeType: productMimeType } },
         ],
@@ -115,9 +119,13 @@ export async function geminiTryOn(
   // Step 2: Apply isolated outfit to customer photo
   const result = await callGemini({
     systemInstruction: {
-      parts: [{ text: `Put the outfit from IMAGE 1 onto the customer in IMAGE 2. IMAGE 1 is only a flat reference for the outfit's design, color, and fabric — it may show the outfit with no person inside, but ignore that; do NOT copy any emptiness or hollowness from it.
+      parts: [{ text: `Put the outfit from IMAGE 1 onto the customer in IMAGE 2. IMAGE 1 is ONLY a flat swatch reference for the outfit's design, color, pattern, and fabric. Ignore everything else about IMAGE 1 — its pose, its framing, its crop, its body proportions, and any emptiness or hollowness. Never copy IMAGE 1's composition.
 
-The customer in IMAGE 2 is a real person and must stay fully visible and intact: keep their face, head, hair, neck, hands, arms, legs, feet, body, pose, and background exactly as they are. The person is wearing the outfit — there is always a real body filling the clothes, never a hollow or empty outfit. Only change their clothing into the outfit from IMAGE 1, keeping its design the same and making it look naturally worn on their body in their pose, covering them modestly.` }],
+IMAGE 2 defines the final image completely. Keep its exact camera framing, crop, zoom, aspect ratio, and composition. The customer's body must be shown to exactly the same extent as in IMAGE 2 and no further: if IMAGE 2 is cropped at the waist, the result is cropped at the waist; if the legs or feet are not in IMAGE 2, they must NOT appear in the result. Do NOT zoom out, extend the frame, add missing body parts, or turn a partial shot into a full-body shot.
+
+Keep everything about the customer exactly as it is in IMAGE 2 — face, head, hair, skin, body proportions, pose, limb positions, anything they are holding, and the background. They are a real person with a real body filling the clothes, never a hollow or empty outfit.
+
+Change ONLY their clothing into the outfit from IMAGE 1, keeping its design the same and making it look naturally worn on their body in their pose, covering them modestly. Adapt the outfit to fit the visible crop — show only the portion of the garment that falls inside IMAGE 2's frame.` }],
     },
     contents: [
       {
@@ -127,7 +135,7 @@ The customer in IMAGE 2 is a real person and must stay fully visible and intact:
           { inlineData: { data: garment.data, mimeType: garment.mimeType } },
           { text: 'IMAGE 2 — the customer:' },
           { inlineData: { data: userPhotoBase64, mimeType: userMimeType } },
-          { text: 'Now show this same customer, fully visible as a real person, wearing the outfit from IMAGE 1 — naturally fitted to their body and pose, covering them modestly, with no hollow or empty parts. Keep their face, head, hair, hands, feet, body, pose, and background unchanged.' },
+          { text: 'Now show this same customer wearing the outfit from IMAGE 1 — naturally fitted to their body and pose, covering them modestly, with no hollow or empty parts. Keep IMAGE 2 exactly as it is apart from the clothing: same face, hair, body, pose, held objects, background, and above all the same camera crop and framing. Show no more of their body than IMAGE 2 already shows — do not extend the frame or invent body parts that are outside it.' },
         ],
       },
     ],
