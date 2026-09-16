@@ -104,9 +104,30 @@ async function main() {
     console.log(`Deleted: ${deleted}`);
     if (failed) console.log(`Failed:  ${failed}`);
     console.log('');
-    console.log('Note: objects were served with a 1-year cache header, so any');
-    console.log('already-cached copies at a CDN/browser edge may persist until');
-    console.log('they expire. The origin objects are gone.');
+
+    if (failed && deleted === 0) {
+      console.log('NOTHING WAS DELETED. The customer images are still in the');
+      console.log('bucket and still publicly reachable.');
+      console.log('');
+      console.log('If the failures above say "storage.objects.delete denied",');
+      console.log('the service account can upload but not delete. Grant it the');
+      console.log('Storage Object Admin role on this bucket (or run the purge');
+      console.log('as an account that already has it), then re-run.');
+      process.exitCode = 1;
+      return;
+    }
+
+    if (failed) {
+      console.log(`WARNING: ${failed} object(s) could not be deleted and remain`);
+      console.log('in the bucket. Re-run after resolving the errors above.');
+      process.exitCode = 1;
+    }
+
+    if (deleted) {
+      console.log('Note: objects were served with a 1-year cache header, so any');
+      console.log('already-cached copies at a CDN/browser edge may persist until');
+      console.log('they expire. The origin objects that were deleted are gone.');
+    }
   } else {
     console.log('Nothing deleted. Re-run with --confirm to delete.');
   }
