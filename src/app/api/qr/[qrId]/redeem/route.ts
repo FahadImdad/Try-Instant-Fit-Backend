@@ -28,7 +28,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { data: qr, error: qrError } = await supabase
       .from('qr_codes')
-      .select('id, brand_id, requires_passcode, total_limit, total_used, expires_at, active')
+      .select('id, brand_id, requires_passcode, total_limit, total_used, free_used_count, expires_at, active')
       .eq('id', qrId)
       .maybeSingle();
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (qr.expires_at && new Date(qr.expires_at) < new Date()) {
       return NextResponse.json({ allowed: false, reason: 'qr_expired' }, { status: 410, headers: QR_CORS });
     }
-    if (!qr.requires_passcode && qr.total_limit !== null && qr.total_used >= qr.total_limit) {
+    if (!qr.requires_passcode && qr.total_limit !== null && (qr.free_used_count || 0) >= qr.total_limit) {
       await supabase.from('qr_codes').update({ requires_passcode: true, updated_at: new Date().toISOString() }).eq('id', qr.id);
       return NextResponse.json({ allowed: false, reason: 'passcode_required' }, { status: 403, headers: QR_CORS });
     }
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json(
       {
         allowed: true,
-        remaining: qr.total_limit !== null ? qr.total_limit - qr.total_used : null,
+        remaining: qr.total_limit !== null ? Math.max(0, qr.total_limit - (qr.free_used_count || 0)) : null,
       },
       { status: 200, headers: QR_CORS },
     );

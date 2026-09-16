@@ -18,13 +18,32 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { data, error } = await supabase
       .from('qr_codes')
-      .select('id, token, product_id, product_uuid, product_name, display_image_url, requires_passcode, total_limit, total_used, expires_at, active, created_at')
+      .select('id, token, product_id, product_uuid, product_name, display_image_url, requires_passcode, total_limit, total_used, free_used_count, expires_at, active, created_at')
       .eq('brand_id', brandId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
     const qrRows = data ?? [];
+    const qrIds = qrRows.map(q => q.id);
+    const { data: scanRows } = qrIds.length
+      ? await supabase
+          .from('qr_scans')
+          .select('qr_id, brand_passcode_id, completed_at, status')
+          .in('qr_id', qrIds)
+          .eq('status', 'completed')
+      : { data: [] };
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const scanStats: Record<string, { today: number; free: number; passcode: number }> = {};
+    for (const scan of scanRows ?? []) {
+      const stats = scanStats[scan.qr_id] ?? { today: 0, free: 0, passcode: 0 };
+      const completedAt = scan.completed_at;
+      if (completedAt && new Date(completedAt) >= todayStart) stats.today += 1;
+      if (scan.brand_passcode_id) stats.passcode += 1;
+      else stats.free += 1;
+      scanStats[scan.qr_id] = stats;
+    }
 
     // Fetch all the brand's products in one shot, key by id and sku
     const { data: productRows } = await supabase
@@ -64,6 +83,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       const p = (q.product_uuid && productByUuid[q.product_uuid]) || productBySku[q.product_id];
       return {
         ...q,
+        today_tryons: scanStats[q.id]?.today ?? 0,
+        free_tryons: scanStats[q.id]?.free ?? q.free_used_count ?? 0,
+        passcode_tryons: scanStats[q.id]?.passcode ?? Math.max(0, (q.total_used ?? 0) - (q.free_used_count ?? 0)),
         product: p
           ? { id: p.id, sku: p.sku, name: p.name, price: p.price, currency: p.currency, image_url: p.image_url }
           : null,

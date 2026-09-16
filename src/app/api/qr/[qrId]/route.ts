@@ -63,9 +63,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           { status: 400, headers: QR_CORS },
         );
       }
-      const { data: current } = await supabase.from('qr_codes').select('total_used').eq('id', qrId).maybeSingle();
+      const { data: current } = await supabase.from('qr_codes').select('free_used_count').eq('id', qrId).maybeSingle();
       if (!current) return NextResponse.json({ error: 'QR not found' }, { status: 404, headers: QR_CORS });
-      if (proposedLimit <= (current.total_used || 0)) {
+      if (proposedLimit <= (current.free_used_count || 0)) {
         return NextResponse.json(
           { error: 'The open try-on cap must be greater than the number already used' },
           { status: 400, headers: QR_CORS },

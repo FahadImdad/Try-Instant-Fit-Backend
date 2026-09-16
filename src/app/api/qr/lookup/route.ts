@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     const { data: qr, error } = await supabase
       .from('qr_codes')
-      .select('id, token, brand_id, product_id, product_uuid, product_name, display_image_url, requires_passcode, total_limit, total_used, expires_at, active')
+      .select('id, token, brand_id, product_id, product_uuid, product_name, display_image_url, requires_passcode, total_limit, total_used, free_used_count, expires_at, active')
       .eq('token', token)
       .maybeSingle();
 
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'QR has expired' }, { status: 410, headers: QR_CORS });
     }
 
-    if (qr.total_limit !== null && qr.total_used >= qr.total_limit && !qr.requires_passcode) {
+    if (qr.total_limit !== null && (qr.free_used_count || 0) >= qr.total_limit && !qr.requires_passcode) {
       await supabase.from('qr_codes').update({ requires_passcode: true, updated_at: new Date().toISOString() }).eq('id', qr.id);
       qr.requires_passcode = true;
     }
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
         custom_size_note: product?.custom_size_note || null,
         display_image_url: product?.image_url || qr.display_image_url,
         requires_passcode: qr.requires_passcode,
-        remaining: qr.total_limit !== null ? Math.max(0, qr.total_limit - qr.total_used) : null,
+        remaining: qr.total_limit !== null ? Math.max(0, qr.total_limit - (qr.free_used_count || 0)) : null,
         brand: brand ? { id: qr.brand_id, ...brand } : null,
       },
       { status: 200, headers: QR_CORS },
