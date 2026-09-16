@@ -10,20 +10,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'brand_id and event_name are required' }, { status: 400 });
     }
 
-    // Fire-and-forget insert — analytics should never block the widget
-    supabase
+    // Await persistence so serverless runtimes cannot terminate before the
+    // analytics event reaches Supabase. Client calls remain non-blocking.
+    const { error: insertError } = await supabase
       .from('analytics_events')
       .insert({
         brand_id,
         event_name,
         event_data: event_data ?? {},
         page_url: page_url ?? null,
-        product: 'ghost-layer',
+        product: event_data?.source ?? 'ghost-layer',
         created_at: timestamp ?? new Date().toISOString(),
-      })
-      .then(({ error }) => {
-        if (error) console.error('[track] Insert error:', error.message);
       });
+
+    if (insertError) {
+      console.error('[track] Insert error:', insertError.message);
+      return NextResponse.json({ error: 'Failed to track event' }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

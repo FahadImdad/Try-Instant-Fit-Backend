@@ -130,11 +130,12 @@ export async function GET(
     for (const s of SOURCES) bySource[s].cost_usd_total = Math.round(bySource[s].cost_usd_total * 10000) / 10000;
 
     // ── Button clicks (Ghost Layer widget specific) ──────────────────────────
-    const { count: buttonClicks } = await supabase
-      .from('analytics_events')
-      .select('*', { count: 'exact', head: true })
-      .eq('brand_id', brandId)
-      .eq('event_name', 'tryon_opened');
+    const [{ count: buttonClicks }, { count: buyNowClicks }] = await Promise.all([
+      supabase.from('analytics_events').select('*', { count: 'exact', head: true })
+        .eq('brand_id', brandId).eq('event_name', 'tryon_opened'),
+      supabase.from('analytics_events').select('*', { count: 'exact', head: true })
+        .eq('brand_id', brandId).eq('event_name', 'buy_now_clicked'),
+    ]);
 
     // ── Top-up history + rolling bar ──────────────────────────────────────────
     // The brand dashboard wants two things:
@@ -224,6 +225,30 @@ export async function GET(
     }
     const allProducts = Array.from(productMap.values()).sort((a, b) => b.tryon_count - a.tryon_count);
 
+    // Rank garments across every entry point. A garment tried from both the
+    // website widget and a QR still occupies a single leaderboard position.
+    const leaderboardMap = new Map<string, {
+      product_id: string;
+      product_name: string;
+      tryon_count: number;
+      isolated_garment_url: string | null;
+    }>();
+    for (const r of tryons) {
+      const pid = r.product_id ?? 'unknown';
+      const current = leaderboardMap.get(pid);
+      if (current) current.tryon_count++;
+      else leaderboardMap.set(pid, {
+        product_id: pid,
+        product_name: r.product_name ?? pid,
+        tryon_count: 1,
+        isolated_garment_url: garmentByProductId[pid] ?? null,
+      });
+    }
+    const topGarments = Array.from(leaderboardMap.values())
+      .sort((a, b) => b.tryon_count - a.tryon_count || a.product_name.localeCompare(b.product_name))
+      .slice(0, 5)
+      .map((item, index) => ({ rank: index + 1, ...item }));
+
     // ── Scan & Wear specific (QRs + brand-wide passcodes + scan events) ─────
     // Passcodes were migrated from per-QR (qr_passcodes) → brand-wide
     // (brand_passcodes); the dashboard's "Passcodes" count was reading from
@@ -260,6 +285,7 @@ export async function GET(
         this_month: overall.this_month,
         avg_processing_ms: overall.avg_processing_ms,
         button_clicks: buttonClicks ?? 0,
+        buy_now_clicks: buyNowClicks ?? 0,
         cost_usd_total: overall.cost_usd_total,
         // Breakdown of where credits went, so the dashboard can show
         // "X spent on customer try-ons" vs "Y spent on QR/product processing"
@@ -303,6 +329,7 @@ export async function GET(
       },
       // Legacy fields (existing dashboard still reads these)
       recent,
+      top_garments: topGarments,
       products: allProducts.map(p => ({
         product_id: p.product_id,
         product_name: p.product_name,
