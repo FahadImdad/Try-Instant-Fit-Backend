@@ -101,10 +101,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         custom_size_available: fd.get('custom_size_available') === 'true' || fd.get('custom_size_available') === '1',
         custom_size_note: fd.get('custom_size_note'),
         buy_url: fd.get('buy_url'),
-        // Catalog publication is explicit. Absent means private.
+        // Products join the catalogue by default; send show_in_catalog=false
+        // to keep one private.
         show_in_catalog: fd.has('show_in_catalog')
           ? fd.get('show_in_catalog') === 'true' || fd.get('show_in_catalog') === '1'
-          : false,
+          : true,
       };
     } else {
       body = await request.json();
@@ -207,7 +208,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         available_sizes: normalizeSizes(available_sizes),
         custom_size_available: custom_size_available === true,
         custom_size_note: custom_size_available === true ? custom_size_note?.trim().slice(0, 240) || null : null,
-        show_in_catalog: show_in_catalog === true,
+        // Default to visible: only an explicit false keeps a product private.
+        show_in_catalog: show_in_catalog !== false,
         buy_url: normalizeBuyUrl(buy_url),
         image_url: imageUrl,
         isolated_garment_url: isolatedUrl,
