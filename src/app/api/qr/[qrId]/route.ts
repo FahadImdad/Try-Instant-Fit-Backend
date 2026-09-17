@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { QR_CORS } from '@/lib/qr';
+import { logActivity } from '@/lib/activity';
 
 interface RouteParams {
   params: Promise<{ qrId: string }>;
@@ -79,6 +80,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (body.total_limit === null || typeof body.total_limit === 'number') update.total_limit = body.total_limit;
     if (body.expires_at === null || typeof body.expires_at === 'string') update.expires_at = body.expires_at;
 
+    // Capture the values before the write: the row only holds its current
+    // state, so a switch between free and passcode access leaves no trace once
+    // it has happened.
+    const { data: before } = await supabase
+      .from('qr_codes')
+      .select('brand_id, product_name, product_id, requires_passcode, active, total_limit')
+      .eq('id', qrId)
+      .maybeSingle();
+
     const { data, error } = await supabase
       .from('qr_codes')
       .update(update)
@@ -89,6 +99,46 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (error) throw error;
     if (!data) {
       return NextResponse.json({ error: 'QR not found' }, { status: 404, headers: QR_CORS });
+    }
+
+    if (before?.brand_id) {
+      const label = before.product_name || before.product_id || 'a product';
+      if (typeof body.requires_passcode === 'boolean' && body.requires_passcode !== before.requires_passcode) {
+        await logActivity({
+          brandId: before.brand_id,
+          action: 'qr.access_changed',
+          entity: 'qr',
+          entityId: qrId,
+          summary: body.requires_passcode
+            ? `Switched "${label}" from free try-ons to passcode-only`
+            : `Switched "${label}" from passcode-only to free try-ons`,
+          detail: {
+            from: before.requires_passcode ? 'passcode' : 'free',
+            to: body.requires_passcode ? 'passcode' : 'free',
+            product: label,
+          },
+        });
+      }
+      if (typeof body.active === 'boolean' && body.active !== before.active) {
+        await logActivity({
+          brandId: before.brand_id,
+          action: body.active ? 'qr.activated' : 'qr.deactivated',
+          entity: 'qr',
+          entityId: qrId,
+          summary: `${body.active ? 'Enabled' : 'Disabled'} QR scanning for "${label}"`,
+          detail: { product: label },
+        });
+      }
+      if (typeof body.total_limit === 'number' && body.total_limit !== before.total_limit) {
+        await logActivity({
+          brandId: before.brand_id,
+          action: 'qr.limit_changed',
+          entity: 'qr',
+          entityId: qrId,
+          summary: `Changed the free try-on cap for "${label}" to ${body.total_limit}`,
+          detail: { from: before.total_limit, to: body.total_limit, product: label },
+        });
+      }
     }
 
     return NextResponse.json({ qr: data }, { status: 200, headers: QR_CORS });
