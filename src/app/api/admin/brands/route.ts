@@ -42,7 +42,9 @@ export async function GET(request: NextRequest) {
     const countsByBrand = new Map<string, { tryon_count: number; process_count: number }>();
     for (const r of (tryonRows ?? []) as { brand_id: string; product_name: string | null }[]) {
       const c = countsByBrand.get(r.brand_id) ?? { tryon_count: 0, process_count: 0 };
-      if ((r.product_name ?? '').startsWith('[Setup]')) c.process_count++;
+      // [Reprocess] is the same charge as [Setup]: a garment re-isolated after
+      // a product image change, not a customer try-on.
+      if ((r.product_name ?? '').startsWith('[Setup]') || (r.product_name ?? '').startsWith('[Reprocess]')) c.process_count++;
       else c.tryon_count++;
       countsByBrand.set(r.brand_id, c);
     }

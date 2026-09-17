@@ -64,7 +64,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     for (const t of tryonRows ?? []) {
       // "[Setup] …" rows are the one-off garment isolation charged when a
       // product is added — not a customer try-on.
-      if ((t.product_name ?? '').startsWith('[Setup]')) continue;
+      if ((t.product_name ?? '').startsWith('[Setup]') || (t.product_name ?? '').startsWith('[Reprocess]')) continue;
       bump(t.product_id, t);
       if (t.product_uuid && t.product_uuid !== t.product_id) bump(t.product_uuid, t);
     }

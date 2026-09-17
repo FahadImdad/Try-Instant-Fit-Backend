@@ -36,7 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const unauthorized = requireBrandAuth(request, brandId); if (unauthorized) return unauthorized;
 
   try {
-    const [logged, products, qrs, passcodes, topups, requests, reports, tryons] = await Promise.all([
+    const [logged, products, qrs, passcodes, topups, requests, tryons] = await Promise.all([
       supabase.from('activity_log')
         .select('id, action, entity, entity_id, summary, detail, actor, created_at')
         .eq('brand_id', brandId).order('created_at', { ascending: false }).limit(500),
@@ -46,7 +46,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       supabase.from('brand_credit_topups').select('id, credits_added, amount_usd, created_at').eq('brand_id', brandId),
       supabase.from('credit_topup_requests')
         .select('id, credits_requested, amount_usd, status, created_at, reviewed_at, rejection_reason').eq('brand_id', brandId),
-      supabase.from('tryon_reports').select('id, type, product_id, status, credit_refunded, created_at').eq('brand_id', brandId),
       supabase.from('tryons').select('id, product_name, product_id, brand_passcode_id, created_at').eq('brand_id', brandId),
     ]);
 
@@ -109,19 +108,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    for (const r of reports.data ?? []) {
-      items.push({
-        id: `rep-${r.id}`, at: r.created_at, entity: 'report', actor: 'customer',
-        icon: '⚠️', title: `Try-on reported${r.product_id ? ` for ${r.product_id}` : ''}`,
-        detail: [r.type, r.credit_refunded ? 'credit refunded' : null].filter(Boolean).join(' · ') || undefined,
-      });
-    }
-
     // Try-ons, grouped by calendar day. Setup rows are the one-off garment
     // isolation charged at upload, not customer try-ons.
     const byDay = new Map<string, { free: number; passcode: number; products: Set<string> }>();
     for (const t of tryons.data ?? []) {
-      if ((t.product_name ?? '').startsWith('[Setup]')) continue;
+      if ((t.product_name ?? '').startsWith('[Setup]') || (t.product_name ?? '').startsWith('[Reprocess]')) continue;
       const day = String(t.created_at).slice(0, 10);
       const g = byDay.get(day) ?? { free: 0, passcode: 0, products: new Set<string>() };
       if (t.brand_passcode_id) g.passcode += 1; else g.free += 1;

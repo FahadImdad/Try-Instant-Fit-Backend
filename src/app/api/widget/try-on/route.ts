@@ -37,7 +37,9 @@ export async function POST(request: NextRequest) {
     const sourceParam = (formData.get('source') as string | null)?.trim() || 'ghost-layer';
     const source: 'ghost-layer' | 'scan-wear' | 'digital-mirror' =
       sourceParam === 'scan-wear' || sourceParam === 'digital-mirror' ? sourceParam : 'ghost-layer';
-    const qrId       = formData.get('qr_id')        as string | null;
+    // Reassigned below: a catalog hand-off arrives without a qr_id, and the
+    // product's own QR is resolved so bookkeeping still runs.
+    let   qrId       = formData.get('qr_id')        as string | null;
     const passcodeId = formData.get('passcode_id')  as string | null;
     const customerEmail = (formData.get('customer_email') as string | null)?.trim().toLowerCase() || '';
     const customerName = (formData.get('customer_name') as string | null)?.trim() || '';
@@ -101,6 +103,29 @@ export async function POST(request: NextRequest) {
       productId = productId || qrProduct.product_id;
       productUuid = productUuid || qrProduct.product_uuid;
       productName = productName || qrProduct.product_name;
+    }
+
+    // Catalog browse hands off a product with no qr_id. Every downstream
+    // control — the free try-on cap, the automatic switch to passcode-only
+    // when that cap is reached, qr_scans, and the passcode counter — hangs off
+    // qrId, so without this the catalog path consumed try-ons while enforcing
+    // none of them. Resolve the product's own QR so both entry points run the
+    // identical bookkeeping.
+    if (!qrId && (productUuid || productId)) {
+      const lookup = supabase
+        .from('qr_codes')
+        .select('id, product_uuid, product_id')
+        .eq('brand_id', brandId)
+        .eq('active', true)
+        .limit(1);
+      const { data: ownQr } = productUuid
+        ? await lookup.eq('product_uuid', productUuid).maybeSingle()
+        : await lookup.eq('product_id', productId as string).maybeSingle();
+      if (ownQr?.id) {
+        qrId = ownQr.id;
+        productUuid = productUuid || ownQr.product_uuid;
+        console.log(`[try-on] Catalog hand-off resolved to QR ${qrId} (product=${productId})`);
+      }
     }
 
     // product_image_url is only used as a fallback display ref and isn't

@@ -58,7 +58,7 @@ export async function GET(
     // — at typical volumes (<50k/year) this is fine. Tightens N queries → 1.
     const { data: allTryons } = await supabase
       .from('tryons')
-      .select('id, product_id, product_name, source, result_image_url, processing_time_ms, cost_usd, created_at, ai_model')
+      .select('id, product_id, product_name, source, result_image_url, processing_time_ms, cost_usd, created_at, ai_model, sold, sold_price, sold_currency, brand_passcode_id')
       .eq('brand_id', brandId)
       .order('created_at', { ascending: false });
 
@@ -67,8 +67,13 @@ export async function GET(
     // count them in TOTAL TRY-ONS / TODAY etc — but we DO surface them
     // separately as "QR processing" credits so the brand can see exactly
     // where their credit balance went.
-    const setupRows = (allTryons ?? []).filter(r => (r.product_name ?? '').startsWith('[Setup]'));
-    const tryons    = (allTryons ?? []).filter(r => !(r.product_name ?? '').startsWith('[Setup]'));
+    // [Reprocess] rows are the same thing as [Setup] — a garment re-isolated
+    // after a product image change. They were previously counted as customer
+    // try-ons, inflating the figures.
+    const isProcessing = (name: string | null) =>
+      (name ?? '').startsWith('[Setup]') || (name ?? '').startsWith('[Reprocess]');
+    const setupRows = (allTryons ?? []).filter(r => isProcessing(r.product_name));
+    const tryons    = (allTryons ?? []).filter(r => !isProcessing(r.product_name));
 
     const setupCreditsUsed = setupRows.length;
     const setupCostUsdTotal = Math.round(
@@ -309,8 +314,29 @@ export async function GET(
       // and must never reach the client (dashboard doesn't use it anyway).
     }));
 
+    // ── Sales, from try-ons a vendor marked sold in the passcode view ────────
+    // Revenue is summed per currency and never across them: adding PKR to EUR
+    // would produce a meaningless number. Conversion rate is against try-ons
+    // that could actually convert — the ones tied to a passcode, where the
+    // vendor knows the customer and can record the sale.
+    const soldRows = tryons.filter(r => r.sold);
+    const passcodeTryons = tryons.filter(r => r.brand_passcode_id).length;
+    const revenueByCurrency: Record<string, number> = {};
+    for (const r of soldRows) {
+      const cur = r.sold_currency || 'PKR';
+      revenueByCurrency[cur] = Math.round(((revenueByCurrency[cur] ?? 0) + Number(r.sold_price ?? 0)) * 100) / 100;
+    }
+
     return NextResponse.json({
       brand,
+      sales: {
+        products_sold: soldRows.length,
+        passcode_tryons: passcodeTryons,
+        // Percentage of passcode try-ons that became a recorded sale.
+        conversion_pct: passcodeTryons > 0
+          ? Math.round((soldRows.length / passcodeTryons) * 100) : 0,
+        revenue_by_currency: revenueByCurrency,
+      },
       stats: {
         total_tryons: overall.total,
         today: overall.today,
